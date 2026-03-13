@@ -14,6 +14,7 @@ from typing import List, Optional, Tuple
 
 VALID_RANK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 VALID_SUITS = ['hearts', 'diamonds', 'clubs', 'spades']
+LOCATIONS = ['tableau', 'freecell', 'foundation']
 
 # Frozen dataclass ensures Card objects are immutable and hashable
 @dataclass(frozen=True)
@@ -68,3 +69,10 @@ class State:
         """Hash for visited set in search algorithms."""
         return hash((self.tableau, self.freecells, self.foundations))
 
+@dataclass(frozen=True)
+class Move:
+    '''Represents a move in the game.'''
+    move_type: str  # 'tableau_to_tableau', 'tableau_to_freecell', etc.
+    card: Card
+    from_pos: Tuple[str, int]  # e.g., ('tableau', 0) or ('freecell', 1)
+    to_pos: Tuple[str, int]  # e.g., ('tableau', 1) or ('foundation', 0)
