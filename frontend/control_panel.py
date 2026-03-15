@@ -1,36 +1,65 @@
-from frontend.qt_compat import QHBoxLayout, QLabel, QPushButton, QWidget, Signal
+from frontend.qt_compat import QHBoxLayout, QLabel, QPushButton, QWidget, Signal, QMenu, QAction
 
 
 class ControlPanel(QWidget):
 	new_game_requested = Signal()
 	undo_requested = Signal()
 	hint_requested = Signal()
+	solve_requested = Signal(str)
 	auto_foundation_requested = Signal()
 
 	def __init__(self, parent=None):
 		super().__init__(parent)
+		self.setObjectName("ControlPanel")
 		self._move_count_label = QLabel("Moves: 0")
-		self._move_count_label.setStyleSheet("color: white; font-weight: bold; font-size: 16px;")
+		self._move_count_label.setObjectName("MoveCountLabel")
 		self._build_ui()
 		
 		self.setStyleSheet("""
-			QPushButton {
-				background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #27ae60, stop:1 #1e8449);
-				color: white;
-				border: 1px solid #145a32;
-				border-radius: 6px;
-				padding: 8px 16px;
+			QWidget#ControlPanel {
+				background-color: rgba(7, 24, 16, 0.52);
+				border: 1px solid rgba(255, 255, 255, 0.14);
+				border-radius: 10px;
+			}
+			QLabel#MoveCountLabel {
+				color: #f4f8f5;
 				font-weight: bold;
-				font-size: 14px;
-				min-width: 80px;
+				font-size: 15pt;
+				padding: 2px 8px;
+				background-color: rgba(255, 255, 255, 0.08);
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				border-radius: 8px;
+			}
+			QPushButton {
+				background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2cb76a, stop:1 #1f8e51);
+				color: white;
+				border: 1px solid #145835;
+				border-radius: 8px;
+				padding: 8px 14px;
+				font-weight: bold;
+				font-size: 12pt;
+				min-width: 92px;
 			}
 			QPushButton:hover {
-				background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2ecc71, stop:1 #229954);
-				border: 1px solid #1e8449;
+				background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #36cc77, stop:1 #2a9f5c);
+				border: 1px solid #1f874d;
 			}
 			QPushButton:pressed {
-				background-color: #145a32;
-				border: 1px solid #0b351c;
+				background-color: #15653a;
+				border: 1px solid #0e3d24;
+			}
+			QMenu {
+				background-color: #123a24;
+				color: #f2fbf4;
+				border: 1px solid #1f6d43;
+				padding: 6px;
+			}
+			QMenu::item {
+				padding: 7px 16px;
+				border-radius: 6px;
+			}
+			QMenu::item:selected {
+				background-color: #219358;
 			}
 		""")
 	def _build_ui(self):
@@ -46,10 +75,14 @@ class ControlPanel(QWidget):
 		undo_button.clicked.connect(self.undo_requested.emit)
 		layout.addWidget(undo_button)
 
-		hint_button = QPushButton("Hint")
-		hint_button.clicked.connect(self.hint_requested.emit)
-		layout.addWidget(hint_button)
-
+		solver_button = QPushButton("Solver")
+		solver_menu = QMenu(solver_button)
+		for algo in ['BFS', 'DFS', 'UCS', 'A*']:
+			action = QAction(algo, self)
+			action.triggered.connect(lambda checked, a=algo: self.solve_requested.emit(a))
+			solver_menu.addAction(action)
+		solver_button.setMenu(solver_menu)
+		layout.addWidget(solver_button)
 		auto_button = QPushButton("Auto Foundation")
 		auto_button.clicked.connect(self.auto_foundation_requested.emit)
 		layout.addWidget(auto_button)
