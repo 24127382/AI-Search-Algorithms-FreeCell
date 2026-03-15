@@ -1,4 +1,7 @@
-from frontend.qt_compat import QHBoxLayout, QLabel, QPushButton, QWidget, Signal, QMenu, QAction
+from frontend.shared.qt import QHBoxLayout, QLabel, QPushButton, QWidget, Signal, QMenu, QAction
+
+
+SOLVER_ALGORITHMS = ("BFS", "DFS", "UCS", "A*")
 
 
 class ControlPanel(QWidget):
@@ -77,7 +80,7 @@ class ControlPanel(QWidget):
 
 		solver_button = QPushButton("Solver")
 		solver_menu = QMenu(solver_button)
-		for algo in ['BFS', 'DFS', 'UCS', 'A*']:
+		for algo in SOLVER_ALGORITHMS:
 			action = QAction(algo, self)
 			action.triggered.connect(lambda checked, a=algo: self.solve_requested.emit(a))
 			solver_menu.addAction(action)

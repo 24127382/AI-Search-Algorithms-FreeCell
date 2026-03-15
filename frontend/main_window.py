@@ -1,7 +1,8 @@
 import sys
-from frontend.board_widget import BoardWidget
+
+from frontend.board.widget import BoardWidget
 from frontend.control_panel import ControlPanel
-from frontend.qt_compat import QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
+from frontend.shared.qt import QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
 
 
 class DifficultyDialog(QDialog):
@@ -41,7 +42,7 @@ class DifficultyDialog(QDialog):
 		layout.setContentsMargins(18, 16, 18, 16)
 		layout.setSpacing(12)
 
-		title = QLabel("Chọn cấp độ trước khi vào game")
+		title = QLabel("Choose a difficulty before starting")
 		title.setStyleSheet("font-size: 13pt; font-weight: bold;")
 		layout.addWidget(title)
 
