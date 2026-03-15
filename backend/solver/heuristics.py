@@ -1,5 +1,5 @@
-"""
-Heuristic functions for search algorithms in FreeCell.
+"""Heuristic helpers for informed search algorithms.
 
-Provides evaluation functions for A* and other informed search methods.
+This module is intentionally lightweight for now. Add heuristic functions here
+when A* or other informed strategies are implemented.
 """
