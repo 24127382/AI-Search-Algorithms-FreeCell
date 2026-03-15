@@ -17,6 +17,18 @@ def can_move_to_foundation(card: Card, foundation: Tuple[Card, ...], f_idx: int)
     
     return card_idx == top_idx + 1
 
+def is_safe_to_foundation(state: State, card: Card) -> bool:
+    """Check if moving a card to the foundation is universally safe."""
+    rank_val = VALID_RANK.index(card.rank) + 1
+    if rank_val <= 2:
+        return True # Aces and Twos are always safe
+        
+    opp_suits = ['clubs', 'spades'] if card.color == 'red' else ['hearts', 'diamonds']
+    for suit in opp_suits:
+        suit_idx = VALID_SUITS.index(suit)
+        if len(state.foundations[suit_idx]) < rank_val - 1:
+            return False
+    return True
 
 def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
     """Check if card can move to tableau column (rank-1, opposite color)."""

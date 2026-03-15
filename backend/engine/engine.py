@@ -12,9 +12,9 @@ Core Functions:
 
 from typing import List
 from backend.model.models import State, Move
-from backend.rule.rules import get_max_sequence_length, get_movable_sequences, find_valid_destinations
+from backend.rule.rules import get_max_sequence_length, get_movable_sequences, find_valid_destinations, is_safe_to_foundation
 
-def get_valid_moves(state: State) -> List[Move]:
+def get_valid_moves(state: State, prune_safe: bool = True) -> List[Move]:
     '''
     Returns all valid moves from the current state.
     Purpose: Generate legal moves for search algorithm to explore.
@@ -22,23 +22,29 @@ def get_valid_moves(state: State) -> List[Move]:
     Respects supermove rule: K = (F + 1) * 2^E (max sequence length limitation).
     '''
     moves = []
-    
+
     max_seq_len = get_max_sequence_length(state)
-    
+
     for col_idx, column in enumerate(state.tableau):
         sequences = get_movable_sequences(column)
         for sequence in sequences:
             if len(sequence) <= max_seq_len:
                 destinations = find_valid_destinations(state, sequence, ('tableau', col_idx))
                 moves.extend(destinations)
-    
+
     for cell_idx, card in enumerate(state.freecells):
         if card is not None:
             destinations = find_valid_destinations(state, [card], ('freecell', cell_idx))
             moves.extend(destinations)
-    
-    return moves
 
+    # Auto-move pruning: if any move to foundation is "safe", it's a dominant move.
+    # Return JUST that single safe move so the solver won't branch on anything else!
+    if prune_safe:
+        for move in moves:
+            if move.to_pos[0] == 'foundation' and is_safe_to_foundation(state, move.card):
+                return [move]
+
+    return moves
 
 def apply_move(state: State, move: Move) -> State:
     """Apply move to state and return new state (immutable)."""
