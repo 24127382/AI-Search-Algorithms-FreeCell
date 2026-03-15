@@ -1,5 +1,10 @@
 from typing import List, Tuple
-from backend.model.models import State, Move, Card, VALID_RANK, VALID_SUITS
+
+from backend.model.models import Card, Move, State, VALID_RANK, VALID_SUITS
+
+
+def _rank_index(rank: str) -> int:
+    return VALID_RANK.index(rank)
 
 def can_move_to_foundation(card: Card, foundation: Tuple[Card, ...], f_idx: int) -> bool:
     """Check if card can move to foundation (same suit, rank+1, matches assigned foundation index)."""
@@ -12,14 +17,14 @@ def can_move_to_foundation(card: Card, foundation: Tuple[Card, ...], f_idx: int)
     
     top_card = foundation[-1]
     
-    top_idx = VALID_RANK.index(top_card.rank)
-    card_idx = VALID_RANK.index(card.rank)
+    top_idx = _rank_index(top_card.rank)
+    card_idx = _rank_index(card.rank)
     
     return card_idx == top_idx + 1
 
 def is_safe_to_foundation(state: State, card: Card) -> bool:
     """Check if moving a card to the foundation is universally safe."""
-    rank_val = VALID_RANK.index(card.rank) + 1
+    rank_val = _rank_index(card.rank) + 1
     if rank_val <= 2:
         return True # Aces and Twos are always safe
         
@@ -37,8 +42,8 @@ def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
     
     top_card = tableau_col[-1]
     
-    top_idx = VALID_RANK.index(top_card.rank)
-    card_idx = VALID_RANK.index(card.rank)
+    top_idx = _rank_index(top_card.rank)
+    card_idx = _rank_index(card.rank)
     
     if card_idx != top_idx - 1:
         return False
@@ -71,14 +76,12 @@ def get_movable_sequences(column: Tuple[Card, ...]) -> List[List[Card]]:
 def _is_valid_sequence_pair(card1: Card, card2: Card) -> bool:
     """Check if card1 (below) and card2 (above) form valid sequence pair."""
     try:
-        rank1_idx = VALID_RANK.index(card1.rank)
-        rank2_idx = VALID_RANK.index(card2.rank)
+        rank1_idx = _rank_index(card1.rank)
+        rank2_idx = _rank_index(card2.rank)
     except ValueError:
         return False
     
-    # check if the ranks are in descending order 
     rank_matches = (rank1_idx == rank2_idx + 1)
-    # check if the colors are alternating
     color_matches = (card1.color != card2.color)
     
     return rank_matches and color_matches
@@ -100,7 +103,6 @@ def find_valid_destinations(state: State, sequence: List[Card], from_pos: Tuple[
             is_valid_len = True
             if not tableau_col:
                 max_k = get_max_sequence_length(state)
-                # When moving to an empty column, the destination cannot be used as an intermediate spot.
                 if len(sequence) > (max_k // 2):
                     is_valid_len = False
             
@@ -122,5 +124,4 @@ def get_max_sequence_length(state: State) -> int:
     empty_freecells = sum(1 for cell in state.freecells if cell is None)
     empty_tableau_cols = sum(1 for col in state.tableau if len(col) == 0)
     
-    K = (empty_freecells + 1) * (2 ** empty_tableau_cols)
-    return K
+    return (empty_freecells + 1) * (2 ** empty_tableau_cols)

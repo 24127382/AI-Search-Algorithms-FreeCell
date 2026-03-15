@@ -1,26 +1,12 @@
-"""
-engine.py 
-
-Game engine for FreeCell card game.
-Implements core game logic: move validation and state transitions.
-
-Core Functions:
-- get_valid_moves: Returns all legal moves from current game state
-- apply_move: Applies a move to the state and returns new state
-- is_goal: Checks if game is won (all cards in foundations)
-"""
+"""Core FreeCell engine: move generation, transition, and goal checks."""
 
 from typing import List
-from backend.model.models import State, Move
-from backend.rule.rules import get_max_sequence_length, get_movable_sequences, find_valid_destinations, is_safe_to_foundation
+
+from backend.model.models import Move, State
+from backend.rule.rules import find_valid_destinations, get_max_sequence_length, get_movable_sequences, is_safe_to_foundation
 
 def get_valid_moves(state: State, prune_safe: bool = True) -> List[Move]:
-    '''
-    Returns all valid moves from the current state.
-    Purpose: Generate legal moves for search algorithm to explore.
-    Workflow: Iterate over tableau and freecells, find movable sequences, and check valid destinations.
-    Respects supermove rule: K = (F + 1) * 2^E (max sequence length limitation).
-    '''
+    """Return all legal moves from the current state."""
     moves = []
 
     max_seq_len = get_max_sequence_length(state)
@@ -37,8 +23,6 @@ def get_valid_moves(state: State, prune_safe: bool = True) -> List[Move]:
             destinations = find_valid_destinations(state, [card], ('freecell', cell_idx))
             moves.extend(destinations)
 
-    # Auto-move pruning: if any move to foundation is "safe", it's a dominant move.
-    # Return JUST that single safe move so the solver won't branch on anything else!
     if prune_safe:
         for move in moves:
             if move.to_pos[0] == 'foundation' and is_safe_to_foundation(state, move.card):
@@ -47,7 +31,7 @@ def get_valid_moves(state: State, prune_safe: bool = True) -> List[Move]:
     return moves
 
 def apply_move(state: State, move: Move) -> State:
-    """Apply move to state and return new state (immutable)."""
+    """Apply one move and return a new immutable state."""
     new_tableau = [list(col) for col in state.tableau]
     new_freecells = list(state.freecells)
     new_foundations = [list(f) for f in state.foundations]
@@ -80,7 +64,7 @@ def apply_move(state: State, move: Move) -> State:
 
 
 def is_goal(state: State) -> bool:
-    """Check if game is won (all foundations have 13 cards)."""
+    """Return True when all foundation piles contain 13 cards."""
     for foundation in state.foundations:
         if len(foundation) != 13:
             return False
