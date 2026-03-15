@@ -1,11 +1,15 @@
 import random
+import time
 
 from backend.engine.engine import apply_move, get_valid_moves, is_goal
+from backend.solver.algorithms import SearchAlgorithm
 from backend.rule.rules import get_movable_sequences, get_max_sequence_length
 from backend.model.models import Card, State, VALID_RANK, VALID_SUITS
 from frontend.animation import fade_in
 from frontend.card_widget import CardWidget, SUIT_SYMBOL
 from frontend.qt_compat import (
+	QThread,
+	QTimer,
 	QHBoxLayout,
 	QLabel,
 	QPushButton,
@@ -21,6 +25,31 @@ from frontend.qt_compat import (
 	QGraphicsOpacityEffect,
 )
 
+DIFFICULTY_LEVELS = ("easy", "medium", "hard", "expert")
+DIFFICULTY_PERCENTILES = {
+	"easy": 0.12,
+	"medium": 0.42,
+	"hard": 0.72,
+	"expert": 0.92,
+}
+DIFFICULTY_SAMPLE_SIZE = 48
+
+class SolverThread(QThread):
+	result_ready = Signal(object)
+	error_occurred = Signal(str)
+
+	def __init__(self, state, algo):
+		super().__init__()
+		self.state = state
+		self.algo = algo
+
+	def run(self):
+		try:
+			solver = SearchAlgorithm(self.state)
+			path = solver.search(self.algo)
+			self.result_ready.emit(path)
+		except Exception as e:
+			self.error_occurred.emit(str(e))
 
 class SlotButton(QPushButton):
 	card_clicked = Signal(tuple)
@@ -157,12 +186,17 @@ class BoardWidget(QWidget):
 	move_count_changed = Signal(int)
 	game_won = Signal()
 
-	def __init__(self, parent=None):
+	def __init__(self, difficulty: str = "medium", parent=None):
 		super().__init__(parent)
 		self.state: State | None = None
 		self.history: list[State] = []
 		self.selected_source: tuple[str, int] | None = None
 		self.move_count = 0
+		self.difficulty = "medium"
+		self.set_difficulty(difficulty)
+		self.solver_thread: SolverThread | None = None
+		self.is_solving = False
+		self._solve_started_at = 0.0
 
 		self._freecell_buttons: list[QPushButton] = []
 		self._foundation_buttons: list[QPushButton] = []
@@ -175,27 +209,27 @@ class BoardWidget(QWidget):
 
 	def _build_ui(self):
 		root_layout = QVBoxLayout(self)
-		root_layout.setContentsMargins(12, 12, 12, 12)
-		root_layout.setSpacing(10)
+		root_layout.setContentsMargins(14, 12, 14, 12)
+		root_layout.setSpacing(9)
 		self.setStyleSheet("""
 			QLabel {
-				color: white;
+				color: #f3f8f4;
 			}
 			QPushButton {
-				background-color: rgba(255, 255, 255, 0.1);
-				border: 2px solid rgba(255, 255, 255, 0.4);
+				background-color: rgba(255, 255, 255, 0.07);
+				border: 2px solid rgba(255, 255, 255, 0.35);
 				border-radius: 8px;
 				color: white;
 				font-weight: bold;
 			}
 			QPushButton:hover {
-				background-color: rgba(255, 255, 255, 0.2);
+				background-color: rgba(255, 255, 255, 0.14);
 				border-color: white;
 			}
 		""")
 
 		top_label = QLabel("FreeCells / Foundations")
-		top_label.setStyleSheet("font-weight: 700; font-size: 15px;")
+		top_label.setStyleSheet("font-weight: 700; font-size: 14pt; letter-spacing: 0.5px;")
 		root_layout.addWidget(top_label)
 
 		top_row = QHBoxLayout()
@@ -229,7 +263,7 @@ class BoardWidget(QWidget):
 		root_layout.addLayout(top_row)
 
 		tableau_title = QLabel("Tableau")
-		tableau_title.setStyleSheet("font-weight: 700; font-size: 15px;")
+		tableau_title.setStyleSheet("font-weight: 700; font-size: 14pt; letter-spacing: 0.5px;")
 		tableau_title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 		root_layout.addWidget(tableau_title)
 
@@ -269,10 +303,7 @@ class BoardWidget(QWidget):
 
 		tableau_row.addStretch()
 
-	def _build_initial_state(self) -> State:
-		deck = [Card(suit=suit, rank=rank) for suit in VALID_SUITS for rank in VALID_RANK]
-		random.shuffle(deck)
-
+	def _build_state_from_deck(self, deck: list[Card]) -> State:
 		tableau = [[] for _ in range(8)]
 		for index, card in enumerate(deck):
 			tableau[index % 8].append(card)
@@ -280,6 +311,56 @@ class BoardWidget(QWidget):
 		freecells = [None, None, None, None]
 		foundations = [[], [], [], []]
 		return State(tableau, freecells, foundations)
+
+	def _estimate_difficulty_score(self, state: State) -> float:
+		valid_moves = get_valid_moves(state, prune_safe=False)
+		immediate_foundation_moves = sum(1 for move in valid_moves if move.to_pos[0] == "foundation")
+		mobility = len(valid_moves)
+
+		movable_sequence_count = 0
+		max_sequence_len = 1
+		for column in state.tableau:
+			sequences = get_movable_sequences(column)
+			movable_sequence_count += len(sequences)
+			if sequences:
+				max_sequence_len = max(max_sequence_len, max(len(seq) for seq in sequences))
+
+		blocked_aces = 0
+		buried_low_cards = 0
+		for column in state.tableau:
+			for idx, card in enumerate(column):
+				is_top = idx == len(column) - 1
+				if card.rank == "A" and not is_top:
+					blocked_aces += 1
+				if card.rank in ("A", "2", "3") and not is_top:
+					buried_low_cards += 1
+
+		score = (
+			100.0
+			+ blocked_aces * 6.0
+			+ buried_low_cards * 2.0
+			- immediate_foundation_moves * 4.0
+			- mobility * 1.1
+			- max_sequence_len * 2.0
+			- movable_sequence_count * 0.4
+		)
+		return score
+
+	def _build_initial_state(self) -> State:
+		target_percentile = DIFFICULTY_PERCENTILES.get(self.difficulty, DIFFICULTY_PERCENTILES["medium"])
+		scored_states: list[tuple[float, State]] = []
+
+		for _ in range(DIFFICULTY_SAMPLE_SIZE):
+			deck = [Card(suit=suit, rank=rank) for suit in VALID_SUITS for rank in VALID_RANK]
+			random.shuffle(deck)
+			candidate_state = self._build_state_from_deck(deck)
+			candidate_score = self._estimate_difficulty_score(candidate_state)
+			scored_states.append((candidate_score, candidate_state))
+
+		scored_states.sort(key=lambda pair: pair[0])
+		target_index = int(round((len(scored_states) - 1) * target_percentile))
+		target_index = max(0, min(target_index, len(scored_states) - 1))
+		return scored_states[target_index][1]
 
 
 	def _on_card_clicked_dispatcher(self, pos: tuple):
@@ -307,6 +388,7 @@ class BoardWidget(QWidget):
 			self._card_registry[card] = cw
 			cw.move(new_pos)
 			cw.show()
+			fade_in(cw, duration=120)
 		else:
 			cw.position = pos_tuple
 			old_parent = cw.parent()
@@ -322,7 +404,7 @@ class BoardWidget(QWidget):
 				cw.show()
 			
 			if cw.pos() != new_pos:
-				animate_move(cw, cw.pos(), new_pos, duration=250)
+				animate_move(cw, cw.pos(), new_pos, duration=165)
 			else:
 				cw.move(new_pos)
 
@@ -334,71 +416,75 @@ class BoardWidget(QWidget):
 		if self.state is None:
 			return
 
-		for idx, button in enumerate(self._freecell_buttons):
-			card = self.state.freecells[idx]
-			selected = self.selected_source == ("freecell", idx)
+		self.setUpdatesEnabled(False)
+		try:
+			for idx, button in enumerate(self._freecell_buttons):
+				card = self.state.freecells[idx]
+				selected = self.selected_source == ("freecell", idx)
 
-			if card:
-				bg = "#f8f9fa"
-				color = "#c0392b" if card.suit in ('hearts', 'diamonds') else "#f7f8fa"
-				border = "4px solid #ffeb3b" if selected else "1px solid #2c3e50"
-				self._update_card_widget(card, button, (0, 0), ("freecell", idx), f"freecell:{idx}", True, [], True, selected)
-			else:
-				bg = "rgba(255,255,255,0)"
-				color = "white"
-				border = "4px solid #ffffff" 
-			button.set_drag_payload(f"freecell:{idx}", card is not None)
-			button.setStyleSheet(f"text-align: center; border: {border}; background-color: {bg}; color: {color}; font-size: 14px; border-radius: 8px;")
+				if card:
+					bg = "#f8f9fa"
+					color = "#c0392b" if card.suit in ('hearts', 'diamonds') else "#f7f8fa"
+					border = "4px solid #ffeb3b" if selected else "1px solid #2c3e50"
+					self._update_card_widget(card, button, (0, 0), ("freecell", idx), f"freecell:{idx}", True, [], True, selected)
+				else:
+					bg = "rgba(255,255,255,0)"
+					color = "white"
+					border = "4px solid #ffffff" 
+				button.set_drag_payload(f"freecell:{idx}", card is not None)
+				button.setStyleSheet(f"text-align: center; border: {border}; background-color: {bg}; color: {color}; font-size: 14pt; border-radius: 8px;")
 
-		for idx, button in enumerate(self._foundation_buttons):
-			fnd_cards = self.state.foundations[idx]
-			top_card = fnd_cards[-1] if fnd_cards else None
-			required_suit = VALID_SUITS[idx]
-			target_sym = SUIT_SYMBOL[required_suit]
-			button.set_drag_payload("", False)
+			for idx, button in enumerate(self._foundation_buttons):
+				fnd_cards = self.state.foundations[idx]
+				top_card = fnd_cards[-1] if fnd_cards else None
+				required_suit = VALID_SUITS[idx]
+				target_sym = SUIT_SYMBOL[required_suit]
+				button.set_drag_payload("", False)
 
-			if top_card:
-				button.setText("")
-				bg = "#f8f9fa"
-				color = "#c0392b" if top_card.suit in ('hearts', 'diamonds') else "#1f2d3d"
-				border = "1px solid #2c3e50"
-				font_size = "14px"
-				# Update ALL cards in this foundation so they stack nicely perfectly inside the button!
-				for c_idx, c in enumerate(fnd_cards):
-					is_top = (c_idx == len(fnd_cards) - 1)
-					self._update_card_widget(c, button, (0, 0), ("foundation", idx), "", False, [], is_top, False)
-			else:
-				button.setText(f"{target_sym}")
-				bg = "rgba(255,255,255,0)"
-				color = "#c0392b" if required_suit in ('hearts', 'diamonds') else "black"
-				border = "4px solid #ffffff"
-				font_size = "32px"
+				if top_card:
+					button.setText("")
+					bg = "#f8f9fa"
+					color = "#c0392b" if top_card.suit in ('hearts', 'diamonds') else "#1f2d3d"
+					border = "1px solid #2c3e50"
+					font_size = "14px"
+					for c_idx, c in enumerate(fnd_cards):
+						is_top = (c_idx == len(fnd_cards) - 1)
+						self._update_card_widget(c, button, (0, 0), ("foundation", idx), "", False, [], is_top, False)
+				else:
+					button.setText(f"{target_sym}")
+					bg = "rgba(255,255,255,0)"
+					color = "#c0392b" if required_suit in ('hearts', 'diamonds') else "black"
+					border = "4px solid #ffffff"
+					font_size = "32px"
 
-			button.setStyleSheet(f"text-align: center; border: {border}; background-color: {bg}; color: {color}; font-size: {font_size}; border-radius: 8px;")
+				button.setStyleSheet(f"text-align: center; border: {border}; background-color: {bg}; color: {color}; font-size: {font_size}; border-radius: 8px;")
 
-		for col_idx, col_cards in enumerate(self.state.tableau):
-			movable_bases = set()
-			for seq in get_movable_sequences(col_cards):
-				movable_bases.add(seq[0])
+			for col_idx, col_cards in enumerate(self.state.tableau):
+				movable_bases = set()
+				for seq in get_movable_sequences(col_cards):
+					movable_bases.add(seq[0])
 
-			for card_idx, card in enumerate(col_cards):
-				is_top = card_idx == len(col_cards) - 1
-				is_draggable = card in movable_bases
-				drag_sequence = col_cards[card_idx:] if is_draggable else []
-				
-				is_selected = False
-				if is_draggable and self.selected_source and self.selected_source[:2] == ("tableau", col_idx):
-					if len(self.selected_source) == 3 and self.selected_source[2] == card_idx:
-						is_selected = True
-					elif len(self.selected_source) == 2 and is_top:
-						is_selected = True
-				
-				self._update_card_widget(card, self._tableau_layouts[col_idx], (0, card_idx * 30), ("tableau", col_idx, card_idx), f"tableau:{col_idx}:{card_idx}", is_draggable, drag_sequence, is_top, is_selected)
+				for card_idx, card in enumerate(col_cards):
+					is_top = card_idx == len(col_cards) - 1
+					is_draggable = card in movable_bases
+					drag_sequence = col_cards[card_idx:] if is_draggable else []
+					
+					is_selected = False
+					if is_draggable and self.selected_source and self.selected_source[:2] == ("tableau", col_idx):
+						if len(self.selected_source) == 3 and self.selected_source[2] == card_idx:
+							is_selected = True
+						elif len(self.selected_source) == 2 and is_top:
+							is_selected = True
+					
+					self._update_card_widget(card, self._tableau_layouts[col_idx], (0, card_idx * 30), ("tableau", col_idx, card_idx), f"tableau:{col_idx}:{card_idx}", is_draggable, drag_sequence, is_top, is_selected)
 
-			col_selected = self.selected_source == ("tableau", col_idx)
-			border = "3px solid #ffeb3b" if col_selected else "4px solid #ffffff"
-			self._tableau_buttons[col_idx].set_drag_payload(f"tableau:{col_idx}", bool(col_cards))
-			self._tableau_buttons[col_idx].setStyleSheet(f"border: {border};")
+				col_selected = self.selected_source == ("tableau", col_idx)
+				border = "3px solid #ffeb3b" if col_selected else "4px solid #ffffff"
+				self._tableau_buttons[col_idx].set_drag_payload(f"tableau:{col_idx}", bool(col_cards))
+				self._tableau_buttons[col_idx].setStyleSheet(f"border: {border};")
+		finally:
+			self.setUpdatesEnabled(True)
+			self.update()
 
 		self.move_count_changed.emit(self.move_count)
 
@@ -459,7 +545,7 @@ class BoardWidget(QWidget):
 			return
 
 		candidate_move = None
-		for move in get_valid_moves(self.state):
+		for move in get_valid_moves(self.state, prune_safe=False):
 			if move.from_pos == (from_pos_engine[0], from_pos_engine[1]) and move.to_pos == (to_pos[0].lower(), to_pos[1]):
 				if expected_card:
 					if move.card == expected_card:
@@ -567,7 +653,7 @@ class BoardWidget(QWidget):
 		if not from_pos_engine:
 			return
 			
-		valid_moves = get_valid_moves(self.state)
+		valid_moves = get_valid_moves(self.state, prune_safe=False)
 		
 		# 1. First try to move to foundation
 		for move in valid_moves:
@@ -624,13 +710,19 @@ class BoardWidget(QWidget):
 			return
 		self._try_move(("Foundation", foundation_idx))
 
+	def set_difficulty(self, difficulty: str):
+		normalized = (difficulty or "medium").strip().lower()
+		if normalized not in DIFFICULTY_LEVELS:
+			normalized = "medium"
+		self.difficulty = normalized
+
 	def new_game(self):
 		self.state = self._build_initial_state()
 		self.history.clear()
 		self.move_count = 0
 		self.selected_source = None
 		self._render()
-		self._emit_status("New game started.")
+		self._emit_status(f"New game started ({self.difficulty.title()}).")
 
 	def undo(self):
 		if not self.history:
@@ -642,11 +734,75 @@ class BoardWidget(QWidget):
 		self._render()
 		self._emit_status("Undid 1 move.")
 
+	
+	def solve_with_algo(self, algo: str):
+		if self.state is None: 
+			return
+		if self.is_solving:
+			self._emit_status("A solver is already running. Please wait.")
+			return
+		if hasattr(self, 'solve_timer') and self.solve_timer:
+			self.solve_timer.stop()
+			self.solve_path = []
+
+		self.is_solving = True
+		self._solve_started_at = time.perf_counter()
+		self._emit_status(f"Solving with {algo}...")
+		
+		self.solver_thread = SolverThread(self.state, algo)
+		self.solver_thread.result_ready.connect(lambda path: self._on_solver_finished(algo, path))
+		self.solver_thread.error_occurred.connect(lambda error: self._on_solver_error(algo, error))
+		self.solver_thread.finished.connect(self._on_solver_thread_finished)
+		self.solver_thread.start()
+
+	def _on_solver_error(self, algo: str, error: str):
+		self._emit_status(f"{algo} error: {error}")
+		self.is_solving = False
+		self.solver_thread = None
+
+	def _on_solver_thread_finished(self):
+		self.is_solving = False
+		self.solver_thread = None
+
+	def _on_solver_finished(self, algo, path):
+		elapsed = time.perf_counter() - self._solve_started_at if self._solve_started_at else 0.0
+		if not path:
+			self._emit_status(f"{algo} failed to find a solution after {elapsed:.1f}s.")
+			return
+			
+		self._emit_status(f"Found a solution in {len(path)} moves ({elapsed:.1f}s). Replaying...")
+		
+		self.solve_path = path
+		self.solve_timer = QTimer(self)
+		self.solve_timer.timeout.connect(self._replay_next_solver_move)
+		self.solve_timer.start(140)
+
+	def _replay_next_solver_move(self):
+		if not hasattr(self, 'solve_path') or not self.solve_path:
+			if hasattr(self, 'solve_timer') and self.solve_timer:
+				self.solve_timer.stop()
+			self._emit_status("Auto-solve complete.")
+			return
+			
+		move = self.solve_path.pop(0)
+		self.history.append(self.state)
+		self.state = apply_move(self.state, move)
+		self.move_count += 1
+		
+		self.move_count_changed.emit(self.move_count)
+		self._render()
+
+		if is_goal(self.state):
+			if hasattr(self, 'solve_timer') and self.solve_timer:
+				self.solve_timer.stop()
+			self.game_won.emit()
+			self._emit_status("You won!")
+
 	def hint(self):
 		if self.state is None:
 			return
 
-		valid_moves = get_valid_moves(self.state)
+		valid_moves = get_valid_moves(self.state, prune_safe=False)
 		if not valid_moves:
 			self._emit_status("No valid moves available.")
 			return
@@ -661,7 +817,7 @@ class BoardWidget(QWidget):
 		if self.state is None:
 			return
 
-		for move in get_valid_moves(self.state):
+		for move in get_valid_moves(self.state, prune_safe=False):
 			if move.to_pos[0] == "foundation":
 				self.history.append(self.state)
 				self.state = apply_move(self.state, move)

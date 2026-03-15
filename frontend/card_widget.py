@@ -120,11 +120,11 @@ class CardWidget(QFrame):
 		
 		painter = QPainter(pixmap)
 		for i, c in enumerate(drag_seq):
-			cw = CardWidget(c, ("dummy", 0))
-			cw.setGeometry(0, 0, self.width(), self.height())
-			cw_pix = QPixmap(cw.size())
-			cw_pix.fill(Qt.GlobalColor.transparent)
-			cw.render(cw_pix)
+			cw_pix = self._build_preview_pixmap(c, self.width(), self.height())
+			if i < len(drag_seq) - 1:
+				overlay = QPainter(cw_pix)
+				overlay.fillRect(0, 0, cw_pix.width(), cw_pix.height(), QColor(0, 0, 0, 30))
+				overlay.end()
 			painter.drawPixmap(0, i * offset, cw_pix)
 		painter.end()
 
@@ -169,6 +169,7 @@ class CardWidget(QFrame):
 	def paintEvent(self, event):
 		painter = QPainter(self)
 		painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+		painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
 		
 		w = self.width()
 		h = self.height()
@@ -196,13 +197,56 @@ class CardWidget(QFrame):
 			painter.drawRect(0, 0, w - 1, h - 1)
 			painter.drawText(0, 0, w, h, Qt.AlignmentFlag.AlignCenter, f"{self.card.rank} of {self.card.suit}")
 
+		painter.setPen(QPen(QColor(255, 255, 255, 55), 1))
+		painter.setBrush(Qt.BrushStyle.NoBrush)
+		painter.drawRoundedRect(0, 0, w - 1, h - 1, 8, 8)
+
+		shadow_path = QPainterPath()
+		shadow_path.addRoundedRect(1.5, h - 12.0, w - 3.0, 10.0, 5.0, 5.0)
+		painter.fillPath(shadow_path, QColor(0, 0, 0, 36))
+
 		# Draw borders based on state
 		if self._selected:
-			painter.setPen(QPen(QColor("#ffeb3b"), 3))
+			painter.setPen(QPen(QColor("#ffe366"), 3))
 			painter.setBrush(Qt.BrushStyle.NoBrush)
 			painter.drawRoundedRect(1, 1, w - 2, h - 2, 8, 8)
 		elif self._hovered and self._drag_enabled:
-			painter.setPen(QPen(QColor("#3498db"), 2))
+			painter.setPen(QPen(QColor("#4eb9ff"), 2))
 			painter.setBrush(Qt.BrushStyle.NoBrush)
 			painter.drawRoundedRect(1, 1, w - 2, h - 2, 8, 8)
+
+	@staticmethod
+	def _build_preview_pixmap(card: Card, width: int, height: int) -> QPixmap:
+		import os
+
+		rank = card.rank
+		if rank.isdigit() and len(rank) == 1:
+			rank = f"0{rank}"
+
+		filename = f"card_{card.suit}_{rank}.png"
+		filepath = os.path.join("asset", "card", filename)
+
+		pixmap = QPixmap(width, height)
+		pixmap.fill(Qt.GlobalColor.transparent)
+
+		painter = QPainter(pixmap)
+		painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+		painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+
+		card_pixmap = QPixmap(filepath)
+		if not card_pixmap.isNull():
+			card_pixmap = card_pixmap.scaled(width, height, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+			painter.drawPixmap(0, 0, card_pixmap)
+		else:
+			painter.fillRect(0, 0, width, height, QColor(Qt.GlobalColor.white))
+			painter.setPen(QColor(Qt.GlobalColor.black))
+			painter.drawRect(0, 0, width - 1, height - 1)
+			painter.drawText(0, 0, width, height, Qt.AlignmentFlag.AlignCenter, f"{card.rank} {SUIT_SYMBOL.get(card.suit, '?')}")
+
+		painter.setPen(QPen(QColor(255, 255, 255, 45), 1))
+		painter.setBrush(Qt.BrushStyle.NoBrush)
+		painter.drawRoundedRect(0, 0, width - 1, height - 1, 8, 8)
+		painter.end()
+
+		return pixmap
 
