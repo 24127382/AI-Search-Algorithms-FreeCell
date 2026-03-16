@@ -38,7 +38,7 @@ class SearchAlgorithm:
         """Uniform Cost Search with memory compaction safeguards."""
         counter = 0
         start_state = self.game_state
-        start_state_id = self._state_id(start_state)
+        start_state_id = state_id(start_state)
         frontier = []
         heappush(frontier, (0, counter, start_state_id, start_state))
 
@@ -67,18 +67,18 @@ class SearchAlgorithm:
                 heapify(frontier)
 
             if len(best_cost) >= next_compaction_at:
-                self._compact_ucs_maps(frontier, current_state_id, best_cost, parent, move_from_parent)
+                compact_ucs_maps(frontier, current_state_id, best_cost, parent, move_from_parent)
                 next_compaction_at = max(UCS_MAX_VISITED_STATES, len(best_cost) + UCS_COMPACTION_GAP)
 
             candidate_moves = get_valid_moves(current_state)
             if len(candidate_moves) > UCS_MAX_MOVES_PER_STATE:
-                candidate_moves.sort(key=self._ucs_move_cost)
+                candidate_moves.sort(key=ucs_move_cost)
                 candidate_moves = candidate_moves[:UCS_MAX_MOVES_PER_STATE]
 
             for move in candidate_moves:
                 next_state = apply_move(current_state, move)
-                next_state_id = self._state_id(next_state)
-                new_cost = cost + self._ucs_move_cost(move)
+                next_state_id = state_id(next_state)
+                new_cost = cost + ucs_move_cost(move)
 
                 old_cost = best_cost.get(next_state_id)
                 if old_cost is not None and new_cost >= old_cost:
@@ -91,15 +91,6 @@ class SearchAlgorithm:
                 heappush(frontier, (new_cost, counter, next_state_id, next_state))
 
         return None
-
-    def _state_id(self, state):
-        return state_id(state)
-
-    def _ucs_move_cost(self, move):
-        return ucs_move_cost(move)
-
-    def _compact_ucs_maps(self, frontier, current_state_id, best_cost, parent, move_from_parent):
-        compact_ucs_maps(frontier, current_state_id, best_cost, parent, move_from_parent)
 
     def _a_star(self, heuristic_func=None):
         pass
