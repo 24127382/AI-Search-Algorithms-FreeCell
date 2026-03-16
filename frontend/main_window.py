@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
 	def __init__(self, difficulty: str = "medium"):
 		super().__init__()
 		self.setWindowTitle(f"FreeCell - {QT_API}")
-		self.resize(800, 600)
+		self.resize(1000, 700)
 
 		self.board = BoardWidget(difficulty=difficulty)
 		self.controls = ControlPanel()
@@ -94,8 +94,8 @@ class MainWindow(QMainWindow):
 
 	def _connect_signals(self):
 		self.controls.new_game_requested.connect(self.board.new_game)
+		self.controls.restart_requested.connect(self.board.restart)
 		self.controls.undo_requested.connect(self.board.undo)
-		self.controls.hint_requested.connect(self.board.hint)
 		self.controls.solve_requested.connect(self.board.solve_with_algo)
 		self.controls.auto_foundation_requested.connect(self.board.auto_to_foundation)
 

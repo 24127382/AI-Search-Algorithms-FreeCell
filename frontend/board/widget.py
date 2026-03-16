@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 
 from backend.model.models import Card, State, VALID_RANK, VALID_SUITS
 from backend.rule.rules import get_movable_sequences
@@ -19,6 +20,7 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	def __init__(self, difficulty: str = "medium", parent=None):
 		super().__init__(parent)
 		self.state: State | None = None
+		self.initial_state: State | None = None
 		self.history: list[State] = []
 		self.selected_source: tuple | None = None
 		self.move_count = 0
@@ -107,7 +109,8 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.difficulty = normalized
 
 	def new_game(self):
-		self.state = self._build_initial_state()
+		self.initial_state = self._build_initial_state()
+		self.state = deepcopy(self.initial_state)
 		self.history.clear()
 		self.move_count = 0
 		self.selected_source = None

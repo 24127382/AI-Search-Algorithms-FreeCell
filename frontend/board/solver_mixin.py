@@ -1,4 +1,5 @@
 import time
+from copy import deepcopy
 
 from backend.engine.engine import apply_move, get_valid_moves, is_goal
 from frontend.card import SUIT_SYMBOL
@@ -79,19 +80,26 @@ class BoardSolverMixin:
 				self.solve_timer.stop()
 			self.game_won.emit()
 			self._emit_status("You won!")
-
-	def hint(self):
+	
+	def restart(self):
 		if self.state is None:
 			return
-
-		valid_moves = get_valid_moves(self.state, prune_safe=False)
-		if not valid_moves:
-			self._emit_status("No valid moves available.")
+		if not getattr(self, "initial_state", None):
+			self._emit_status("Cannot restart: initial state not available.")
 			return
+		if self.is_solving:
+			self._emit_status("Cannot restart while solver is running.")
+			return
+		if hasattr(self, "solve_timer") and self.solve_timer:
+			self.solve_timer.stop()
+			self.solve_path = []
 
-		move = valid_moves[0]
-		symbol = SUIT_SYMBOL[move.card.suit]
-		self._emit_status(f"Hint: {move.card.rank}{symbol} from {move.from_pos} -> {move.to_pos}")
+		self.state = deepcopy(self.initial_state)
+		self.history.clear()
+		self.move_count = 0
+		self.selected_source = None
+		self._render()
+		self._emit_status("Game restarted.")
 
 	def auto_to_foundation(self):
 		if self.state is None:

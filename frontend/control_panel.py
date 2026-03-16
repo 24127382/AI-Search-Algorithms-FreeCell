@@ -6,6 +6,7 @@ SOLVER_ALGORITHMS = ("BFS", "DFS", "UCS", "A*")
 
 class ControlPanel(QWidget):
 	new_game_requested = Signal()
+	restart_requested = Signal()
 	undo_requested = Signal()
 	hint_requested = Signal()
 	solve_requested = Signal(str)
@@ -73,6 +74,10 @@ class ControlPanel(QWidget):
 		new_game_button = QPushButton("New Game")
 		new_game_button.clicked.connect(self.new_game_requested.emit)
 		layout.addWidget(new_game_button)
+
+		restart_button = QPushButton("Restart")
+		restart_button.clicked.connect(self.restart_requested.emit)
+		layout.addWidget(restart_button)
 
 		undo_button = QPushButton("Undo")
 		undo_button.clicked.connect(self.undo_requested.emit)
