@@ -4,7 +4,7 @@ from backend.model.state import State
 from backend.solver.astar import AStarAlgorithm
 from backend.solver.bfs import BFSAlgorithm
 from backend.solver.dfs import DFSAlgorithm
-from backend.solver.ucs import UCSAlgorithm
+from backend.solver.ucs.ucs import UCSAlgorithm
 from enum import Enum
 
 class AlgorithmMode(Enum):
