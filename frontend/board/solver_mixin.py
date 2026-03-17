@@ -2,7 +2,7 @@ import time
 from copy import deepcopy
 
 from backend.engine.engine import apply_move, get_valid_moves
-from frontend.card import SUIT_SYMBOL
+from frontend.card.assets import SUIT_SYMBOL
 from frontend.board.solver_thread import SolverThread
 from frontend.shared.qt import QTimer
 

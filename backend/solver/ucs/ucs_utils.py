@@ -1,6 +1,6 @@
 from heapq import nsmallest
 
-from backend.solver.ucs_profile import UCS_VISITED_KEEP_SIZE
+from backend.solver.ucs.ucs_profile import UCS_VISITED_KEEP_SIZE
 
 
 def state_id(state):

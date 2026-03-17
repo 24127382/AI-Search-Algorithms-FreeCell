@@ -2,7 +2,7 @@ from backend.engine.engine import apply_move, get_valid_moves
 from backend.model.card import Card
 from backend.rule.rules import get_max_sequence_length, get_movable_sequences
 from frontend.board.constants import SLOT_TABLEAU
-from frontend.card import SUIT_SYMBOL
+from frontend.card.assets import SUIT_SYMBOL
 
 
 class BoardMoveCoreMixin:

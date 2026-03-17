@@ -1,7 +1,8 @@
 from backend.model.card import VALID_SUITS
 from backend.rule.rules import get_movable_sequences
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
-from frontend.card import CardWidget, SUIT_SYMBOL
+from frontend.card.assets import SUIT_SYMBOL
+from frontend.card.widget import CardWidget
 from frontend.shared.animation import fade_in
 
 class BoardUiRenderMixin:
