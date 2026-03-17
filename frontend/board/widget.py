@@ -1,9 +1,8 @@
-import random
 from copy import deepcopy
 
-from backend.model.models import Card, State, VALID_RANK, VALID_SUITS
-from backend.rule.rules import get_movable_sequences
-from frontend.board.constants import DIFFICULTY_LEVELS, DIFFICULTY_PERCENTILES, DIFFICULTY_SAMPLE_SIZE
+from backend.engine.shuffle import deal
+from backend.model.state import State
+from frontend.board.constants import DIFFICULTY_LEVELS
 from frontend.board.move_interaction_mixin import BoardMoveInteractionMixin
 from frontend.board.move_core_mixin import BoardMoveCoreMixin
 from frontend.board.solver_mixin import BoardSolverMixin
@@ -25,6 +24,7 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.selected_source: tuple | None = None
 		self.move_count = 0
 		self.difficulty = "medium"
+		self.current_deal_number: int | None = None
 		self.set_difficulty(difficulty)
 		self.solver_thread = None
 		self.is_solving = False
@@ -39,68 +39,10 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self._build_ui()
 		self.new_game()
 
-	def _build_state_from_deck(self, deck: list[Card]) -> State:
-		tableau = [[] for _ in range(8)]
-		for index, card in enumerate(deck):
-			tableau[index % 8].append(card)
-
-		freecells = [None, None, None, None]
-		foundations = [[], [], [], []]
-		return State(tableau, freecells, foundations)
-
-	def _estimate_difficulty_score(self, state: State) -> float:
-		valid_moves = self._collect_valid_moves(state)
-		immediate_foundation_moves = sum(1 for move in valid_moves if move.to_pos[0] == "foundation")
-		mobility = len(valid_moves)
-
-		movable_sequence_count = 0
-		max_sequence_len = 1
-		for column in state.tableau:
-			sequences = get_movable_sequences(column)
-			movable_sequence_count += len(sequences)
-			if sequences:
-				max_sequence_len = max(max_sequence_len, max(len(seq) for seq in sequences))
-
-		blocked_aces = 0
-		buried_low_cards = 0
-		for column in state.tableau:
-			for idx, card in enumerate(column):
-				is_top = idx == len(column) - 1
-				if card.rank == "A" and not is_top:
-					blocked_aces += 1
-				if card.rank in ("A", "2", "3") and not is_top:
-					buried_low_cards += 1
-
-		return (
-			100.0
-			+ blocked_aces * 6.0
-			+ buried_low_cards * 2.0
-			- immediate_foundation_moves * 4.0
-			- mobility * 1.1
-			- max_sequence_len * 2.0
-			- movable_sequence_count * 0.4
-		)
-
 	def _build_initial_state(self) -> State:
-		target_percentile = DIFFICULTY_PERCENTILES.get(self.difficulty, DIFFICULTY_PERCENTILES["medium"])
-		scored_states: list[tuple[float, State]] = []
-
-		for _ in range(DIFFICULTY_SAMPLE_SIZE):
-			deck = [Card(suit=suit, rank=rank) for suit in VALID_SUITS for rank in VALID_RANK]
-			random.shuffle(deck)
-			candidate_state = self._build_state_from_deck(deck)
-			candidate_score = self._estimate_difficulty_score(candidate_state)
-			scored_states.append((candidate_score, candidate_state))
-
-		scored_states.sort(key=lambda pair: pair[0])
-		target_index = int(round((len(scored_states) - 1) * target_percentile))
-		target_index = max(0, min(target_index, len(scored_states) - 1))
-		return scored_states[target_index][1]
-
-	def _collect_valid_moves(self, state: State):
-		from backend.engine.engine import get_valid_moves
-
-		return get_valid_moves(state, prune_safe=False)
+		deal_number, tableau = deal(self.difficulty)
+		self.current_deal_number = deal_number
+		return State.from_lists(tableau=tableau, freecells=[None] * 4, foundations=[[] for _ in range(4)])
 
 	def set_difficulty(self, difficulty: str):
 		normalized = (difficulty or "medium").strip().lower()
@@ -115,4 +57,4 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.move_count = 0
 		self.selected_source = None
 		self._render()
-		self._emit_status(f"New game started ({self.difficulty.title()}).")
+		self._emit_status(f"New game started ({self.difficulty.title()}) - Deal #{self.current_deal_number}.")

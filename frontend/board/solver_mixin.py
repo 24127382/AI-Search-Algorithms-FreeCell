@@ -1,7 +1,7 @@
 import time
 from copy import deepcopy
 
-from backend.engine.engine import apply_move, get_valid_moves, is_goal
+from backend.engine.engine import apply_move, get_valid_moves
 from frontend.card import SUIT_SYMBOL
 from frontend.board.solver_thread import SolverThread
 from frontend.shared.qt import QTimer
@@ -75,7 +75,7 @@ class BoardSolverMixin:
 		self.move_count_changed.emit(self.move_count)
 		self._render()
 
-		if is_goal(self.state):
+		if self.state.is_goal:
 			if hasattr(self, "solve_timer") and self.solve_timer:
 				self.solve_timer.stop()
 			self.game_won.emit()

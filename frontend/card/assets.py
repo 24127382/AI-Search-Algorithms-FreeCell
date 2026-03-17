@@ -1,6 +1,6 @@
 import os
 
-from backend.model.models import Card
+from backend.model.card import Card
 
 
 SUIT_SYMBOL = {

@@ -1,4 +1,4 @@
-from backend.model.models import Card
+from backend.model.card import Card
 from frontend.card.assets import SUIT_SYMBOL
 from frontend.card.drag import (
 	build_drag_mime,

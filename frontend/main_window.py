@@ -1,5 +1,6 @@
 import sys
 
+from frontend.board.constants import DIFFICULTY_LEVELS
 from frontend.board.widget import BoardWidget
 from frontend.control_panel import ControlPanel
 from frontend.shared.qt import QApplication, QDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
@@ -48,7 +49,7 @@ class DifficultyDialog(QDialog):
 
 		button_row = QHBoxLayout()
 		button_row.setSpacing(8)
-		for level in ("easy", "medium", "hard", "expert"):
+		for level in DIFFICULTY_LEVELS:
 			button = QPushButton(level.title())
 			button.clicked.connect(lambda _, lv=level: self._choose_level(lv))
 			button_row.addWidget(button)

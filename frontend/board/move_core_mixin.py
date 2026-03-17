@@ -1,5 +1,5 @@
-from backend.engine.engine import apply_move, get_valid_moves, is_goal
-from backend.model.models import Card
+from backend.engine.engine import apply_move, get_valid_moves
+from backend.model.card import Card
 from backend.rule.rules import get_max_sequence_length, get_movable_sequences
 from frontend.board.constants import SLOT_TABLEAU
 from frontend.card import SUIT_SYMBOL
@@ -49,7 +49,7 @@ class BoardMoveCoreMixin:
 			f"{candidate_move.from_pos} -> {candidate_move.to_pos}"
 		)
 
-		if is_goal(self.state):
+		if self.state.is_goal:
 			self._emit_status("Congratulations! You won FreeCell.")
 			self.game_won.emit()
 
@@ -121,6 +121,6 @@ class BoardMoveCoreMixin:
 		self._emit_status(status_message)
 		self._render()
 
-		if check_goal and is_goal(self.state):
+		if check_goal and self.state.is_goal:
 			self._emit_status("Congratulations! You won FreeCell.")
 			self.game_won.emit()
