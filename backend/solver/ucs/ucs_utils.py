@@ -4,9 +4,18 @@ from backend.solver.ucs_profile import UCS_VISITED_KEEP_SIZE
 
 
 def state_id(state):
-	board_int = getattr(state, "_board_int", None)
-	if board_int is not None:
-		return board_int
+	board_code = getattr(state, "board_code", None)
+	if board_code is not None:
+		return board_code
+
+	legacy_board_code = getattr(state, "_board_code", None)
+	if legacy_board_code is not None:
+		return legacy_board_code
+
+	legacy_board_int = getattr(state, "_board_int", None)
+	if legacy_board_int is not None:
+		return legacy_board_int
+
 	return hash(state)
 
 
