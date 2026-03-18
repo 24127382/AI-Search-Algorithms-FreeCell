@@ -1,3 +1,5 @@
+"""Core move generation and state transition utilities for FreeCell search."""
+
 from typing import List, Optional, Tuple
 from backend.model.move import Move, MoveType
 from backend.model.state import State
@@ -11,11 +13,13 @@ from backend.rule.rules import (
 
 
 def _auto_foundation_priority(move: Move) -> tuple[int, int, int, int]:
+    """Provide a stable priority key for deterministic auto-foundation selection."""
     from_type_priority = 0 if move.from_pos[0] == 'freecell' else 1
     return (move.card.rank_val, from_type_priority, move.from_pos[1], move.to_pos[1])
 
 
 def _move_priority(move: Move) -> tuple[int, int, int, int, int]:
+    """Rank candidate moves so search explores stronger tactical moves first."""
     sequence_len = len(move.sequence) if move.sequence else 1
     if move.to_pos[0] == 'foundation':
         group = 0
@@ -32,6 +36,7 @@ def _move_priority(move: Move) -> tuple[int, int, int, int, int]:
 
 
 def _is_immediate_undo(candidate: Move, last_move: Optional[Move]) -> bool:
+    """Detect simple one-card reversals to reduce unproductive backtracking."""
     if last_move is None:
         return False
     if candidate.from_pos != last_move.to_pos or candidate.to_pos != last_move.from_pos:
@@ -46,6 +51,7 @@ def _is_immediate_undo(candidate: Move, last_move: Optional[Move]) -> bool:
 
 
 def _safe_foundation_move_from_tableau(state: State, col_idx: int) -> Optional[Move]:
+    """Return a tableau->foundation move when it is legal and strategy-safe."""
     column = state.tableau[col_idx]
     if not column:
         return None
@@ -67,6 +73,7 @@ def _safe_foundation_move_from_tableau(state: State, col_idx: int) -> Optional[M
 
 
 def _safe_foundation_move_from_freecell(state: State, cell_idx: int) -> Optional[Move]:
+    """Return a freecell->foundation move when it is legal and strategy-safe."""
     card = state.freecells[cell_idx]
     if card is None:
         return None
@@ -87,6 +94,7 @@ def _safe_foundation_move_from_freecell(state: State, cell_idx: int) -> Optional
 
 
 def _find_forced_foundation_move(state: State) -> Optional[Move]:
+    """Find one deterministic safe move to foundation if any exists."""
     candidates = []
 
     for col_idx in range(len(state.tableau)):
@@ -105,6 +113,7 @@ def _find_forced_foundation_move(state: State) -> Optional[Move]:
 
 
 def apply_forced_foundation_closure(state: State) -> tuple[State, Tuple[Move, ...]]:
+    """Repeatedly apply safe foundation moves until no forced move remains."""
     current_state = state
     forced_moves: list[Move] = []
 
@@ -119,6 +128,7 @@ def apply_forced_foundation_closure(state: State) -> tuple[State, Tuple[Move, ..
 
 
 def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[Move] = None) -> List[Move]:
+    """Generate legal moves, optionally pruning to one forced safe foundation move."""
     moves = []
 
     max_seq_len = get_max_sequence_length(state)
@@ -150,6 +160,7 @@ def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[M
 
 
 def _apply_single_move(state: State, move: Move) -> State:
+    """Apply one already-validated move and return a new immutable state."""
     new_tableau = [list(col) for col in state.tableau]
     new_freecells = list(state.freecells)
     new_foundations = [list(f) for f in state.foundations]
@@ -192,6 +203,7 @@ def _apply_single_move(state: State, move: Move) -> State:
 
 
 def apply_move(state: State, move: Move, collapse_forced: bool = False) -> State:
+    """Apply one move and optionally collapse subsequent forced foundation moves."""
     next_state = _apply_single_move(state, move)
     if not collapse_forced:
         return next_state
@@ -200,5 +212,6 @@ def apply_move(state: State, move: Move, collapse_forced: bool = False) -> State
 
 
 def apply_move_with_forced(state: State, move: Move) -> tuple[State, Tuple[Move, ...]]:
+    """Apply one move and always return the forced-foundation closure sequence."""
     next_state = _apply_single_move(state, move)
     return apply_forced_foundation_closure(next_state)

@@ -27,6 +27,7 @@ class State:
         return all(foundation and foundation[-1].rank == "K" for foundation in self.foundations)
 
     def __post_init__(self):
+        """Normalize containers to tuples and initialize cached encodings."""
         tableau = tuple(tuple(column) for column in self.tableau)
         freecells = tuple(self.freecells)
         foundations = tuple(tuple(stack) for stack in self.foundations)
@@ -37,6 +38,7 @@ class State:
         self._refresh_cached_encodings()
 
     def _refresh_cached_encodings(self, encoded_columns: Optional[Tuple[Tuple[int, ...], ...]] = None):
+        """Refresh canonical board encodings used for hashing and equality."""
         foundation_lengths = tuple(len(stack) for stack in self.foundations)
         packed_foundations = self._pack_foundation_lengths(foundation_lengths)
         packed_freecells = self._pack_freecells(self.freecells)
@@ -57,6 +59,7 @@ class State:
         object.__setattr__(self, "_hash_value", hash(board_code))
 
     def _encode_column(self, column: Tuple[Card, ...]) -> Tuple[int, ...]:
+        """Encode one tableau column into compact integer card ids."""
         return tuple(card.to_int() for card in column)
 
     def _encode_board_key(
@@ -64,6 +67,7 @@ class State:
         foundation_key: Tuple[int, ...],
         encoded_columns: Tuple[Tuple[int, ...], ...],
     ) -> Tuple[int, ...]:
+        """Build a canonical key independent of tableau/freecell ordering artifacts."""
         freecell_cards = sorted(card.to_int() for card in self.freecells if card is not None)
         freecell_key = tuple(
             freecell_cards[idx] if idx < len(freecell_cards) else 0
@@ -79,12 +83,14 @@ class State:
         return tuple(token_stream)
 
     def _build_top_signature(self, foundation_lengths: Tuple[int, ...]) -> Tuple[int, ...]:
+        """Build a compact signature of visible tops and foundation progress."""
         tableau_top = tuple(column[-1].to_int() if column else 0 for column in self.tableau)
         freecell_sig = tuple(card.to_int() if card is not None else 0 for card in self.freecells)
         return (*tableau_top, *freecell_sig, *foundation_lengths)
 
     @staticmethod
     def _pack_foundation_lengths(foundation_lengths: Tuple[int, ...]) -> int:
+        """Pack four foundation lengths into a 16-bit integer."""
         packed = 0
         for idx, length in enumerate(foundation_lengths):
             packed |= (length & 0xF) << (idx * 4)
@@ -92,6 +98,7 @@ class State:
 
     @staticmethod
     def _pack_freecells(freecells: Tuple[Optional[Card], ...]) -> int:
+        """Pack up to four freecell ids into a compact bit representation."""
         packed = 0
         for idx, card in enumerate(freecells):
             card_id = card.to_int() if card is not None else 0
@@ -99,6 +106,7 @@ class State:
         return packed
 
     def _encode_board_integer(self, board_key: Tuple[int, ...]) -> int:
+        """Encode token stream into a single integer for fast comparisons."""
         board_code = 0
         for token in board_key:
             board_code = (board_code << 6) | (token + 1)
@@ -139,6 +147,7 @@ class State:
         foundations,
         touched_tableau_indices: Iterable[int],
     ) -> "State":
+        """Create a new state while reusing untouched cached column encodings."""
         normalized_tableau = tuple(tuple(col) for col in tableau)
         normalized_freecells = tuple(freecells)
         normalized_foundations = tuple(tuple(stack) for stack in foundations)
@@ -156,6 +165,7 @@ class State:
 
     @classmethod
     def from_lists(cls, tableau, freecells, foundations) -> "State":
+        """Convenience constructor from mutable list-based board structures."""
         return cls(
             tableau=tuple(tuple(col) for col in tableau),
             freecells=tuple(freecells),

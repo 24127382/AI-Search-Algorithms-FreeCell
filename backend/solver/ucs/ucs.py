@@ -20,9 +20,12 @@ from backend.solver.ucs.ucs_utils import (
 
 
 class UCSAlgorithm:
+    """Uniform-Cost Search with configurable performance/memory trade-offs."""
+
     VALID_MODES = {"first", "speed", "memory"}
 
     def __init__(self, game_state, mode="speed"):
+        """Initialize UCS with a fixed start state and execution mode."""
         self.game_state = game_state
         if mode not in self.VALID_MODES:
             raise ValueError(f"Unsupported UCS mode: {mode}")
@@ -30,14 +33,17 @@ class UCSAlgorithm:
         self.last_run_stats = None
 
     def _mode_config(self):
+        """Resolve runtime tuning knobs for the current mode."""
         return UCS_MODE_PROFILES[self.mode]
 
     def _finalize_stats(self, stats, started_at, solution_found):
+        """Finalize run statistics and persist them on the solver instance."""
         stats["elapsed_seconds"] = perf_counter() - started_at
         stats["solution_found"] = solution_found
         self.last_run_stats = stats
 
     def _log_progress(self, started_at, stats, frontier_size, visited_size, window_expanded, window_seconds):
+        """Emit periodic runtime telemetry for long UCS runs."""
         elapsed = max(perf_counter() - started_at, 1e-9)
         window_nodes_per_sec = window_expanded / max(window_seconds, 1e-9)
         print(
@@ -52,6 +58,7 @@ class UCSAlgorithm:
 
     @staticmethod
     def _priority_bias(state) -> int:
+        """Tie-break equal-cost nodes by progress toward foundations."""
         foundation_bits = state.foundation_bits
         foundation_total = (
             (foundation_bits & 0xF)
@@ -66,6 +73,7 @@ class UCSAlgorithm:
 
     @staticmethod
     def _reconstruct_path(node_index, parent_index_arena, edge_move_ids_arena, move_pool):
+        """Rebuild the full move path by walking parent links backward."""
         path = []
         walk = node_index
         while walk >= 0:
@@ -79,6 +87,7 @@ class UCSAlgorithm:
         return path
 
     def _search_once(self, mode_config):
+        """Run one UCS pass under a specific mode configuration."""
         started_at = perf_counter()
         counter = 0
         start_state = self.game_state
@@ -296,6 +305,7 @@ class UCSAlgorithm:
         return None
 
     def search(self):
+        """Run UCS and optionally fall back to safer modes when needed."""
         mode_config = self._mode_config()
         path = self._search_once(mode_config)
         if path is not None:

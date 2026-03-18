@@ -1,9 +1,12 @@
+"""Runtime profile presets that tune UCS for host machine resources."""
+
 import os
 import platform
 import ctypes
 
 
 def _total_ram_gb() -> float:
+	"""Best-effort detection of total physical RAM in gigabytes."""
 	try:
 		if platform.system() == "Windows":
 			class MEMORYSTATUSEX(ctypes.Structure):
@@ -35,6 +38,7 @@ def _total_ram_gb() -> float:
 
 
 def _machine_limits() -> dict:
+	"""Select conservative search limits based on CPU and available RAM."""
 	cpu_count = os.cpu_count() or 4
 	ram_gb = _total_ram_gb()
 
@@ -89,6 +93,7 @@ def _machine_limits() -> dict:
 
 
 def _build_mode_profiles(limits: dict) -> dict:
+	"""Translate machine limits into mode-specific UCS configuration maps."""
 	max_visited = limits["MAX_VISITED"]
 	max_frontier = limits["MAX_FRONTIER"]
 	keep_frontier = limits["KEEP_FRONTIER"]

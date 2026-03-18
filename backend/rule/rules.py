@@ -1,3 +1,5 @@
+"""Rule evaluation helpers for legal FreeCell moves and sequence limits."""
+
 from functools import lru_cache
 from typing import Iterable, List, Sequence, Tuple
 
@@ -22,14 +24,17 @@ _SUPERMOVE_TO_EMPTY_LIMITS = {
 
 
 def _card_rank(card_id: int) -> int:
+    """Convert a compact card id (1..52) to rank value (1..13)."""
     return ((card_id - 1) % 13) + 1
 
 
 def _is_red(card_id: int) -> bool:
+    """Return whether a compact card id belongs to a red suit."""
     return ((card_id - 1) // 13) < 2
 
 
 def _build_tableau_pair_lookup() -> tuple[tuple[bool, ...], ...]:
+    """Precompute validity for placing one card onto another in tableau."""
     matrix = [[False] * 53 for _ in range(53)]
     for card_id in range(1, 53):
         rank = _card_rank(card_id)
@@ -73,6 +78,7 @@ def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
 
 @lru_cache(maxsize=50000)
 def _get_movable_sequences_cached(column: Tuple[Card, ...]) -> Tuple[Tuple[Card, ...], ...]:
+    """Return all descending alternating-color tails that can move as a block."""
     if not column:
         return tuple()
 
@@ -108,7 +114,7 @@ def find_valid_destinations(
     from_pos: Tuple[str, int],
     max_seq_len: int,
 ) -> List[Move]:
-    """Find all valid destinations for a movable sequence."""
+    """Build all legal destination moves for a source sequence in one state."""
     if len(sequence) > max_seq_len:
         return []
 

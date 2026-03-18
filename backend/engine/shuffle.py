@@ -54,6 +54,7 @@ def _to_tableau(cards: Sequence[Card]) -> tuple[tuple[Card, ...], ...]:
 	return tuple(tuple(column) for column in tableau)
 
 def _normalize_difficulty(difficulty: str) -> str:
+	"""Normalize and validate difficulty labels for curated solved deals."""
 	normalized = (difficulty or "medium").strip().lower()
 	if normalized not in _DIFFICULTY_LEVELS:
 		valid = ", ".join(_DIFFICULTY_LEVELS)
@@ -70,14 +71,14 @@ def deal(difficulty: str = "medium") -> tuple[int, tuple[tuple[Card, ...], ...]]
 
 
 def deal_random() -> tuple[tuple[Card, ...], ...]:
-    """Deal random it doesn't have a game number."""
-    deck = [Card(suit=suit, rank=rank) for suit in VALID_SUITS for rank in VALID_RANK]
-    Random().shuffle(deck)
-    return _to_tableau(deck)
+	"""Deal a fully random game layout without a Microsoft deal number."""
+	deck = [Card(suit=suit, rank=rank) for suit in VALID_SUITS for rank in VALID_RANK]
+	Random().shuffle(deck)
+	return _to_tableau(deck)
 
 def deal_by_game_number(game_number: int) -> tuple[tuple[Card, ...], ...]:
-    """Deal a specific game number using the Microsoft shuffle algorithm."""
-    if game_number < 0:
-        raise ValueError("game_number must be non-negative")
-    tableau = _to_tableau(microsoft_shuffled_deck(game_number))
-    return tableau
+	"""Deal a specific game number using the Microsoft shuffle algorithm."""
+	if game_number < 0:
+		raise ValueError("game_number must be non-negative")
+	tableau = _to_tableau(microsoft_shuffled_deck(game_number))
+	return tableau
