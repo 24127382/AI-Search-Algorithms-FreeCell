@@ -8,6 +8,19 @@ from frontend.shared.qt import QTimer
 
 
 class BoardSolverMixin:
+	@staticmethod
+	def _solver_label(algo: str, ucs_mode: str) -> str:
+		if algo == "UCS":
+			mode_label = {
+				"first": "First Solution",
+				"speed": "Speed + Cost",
+				"memory": "Exact Memory",
+				"fast": "Speed + Cost",
+				"exact": "Exact Memory",
+			}.get(ucs_mode, ucs_mode)
+			return f"UCS ({mode_label})"
+		return algo
+
 	def undo(self):
 		if not self.history:
 			self._emit_status("No moves to undo.")
@@ -18,7 +31,7 @@ class BoardSolverMixin:
 		self._render()
 		self._emit_status("Undid 1 move.")
 
-	def solve_with_algo(self, algo: str):
+	def solve_with_algo(self, algo: str, ucs_mode: str = "speed"):
 		if self.state is None:
 			return
 		if self.is_solving:
@@ -30,11 +43,12 @@ class BoardSolverMixin:
 
 		self.is_solving = True
 		self._solve_started_at = time.perf_counter()
-		self._emit_status(f"Solving with {algo}...")
+		solver_label = self._solver_label(algo, ucs_mode)
+		self._emit_status(f"Solving with {solver_label}...")
 
-		self.solver_thread = SolverThread(self.state, algo)
-		self.solver_thread.result_ready.connect(lambda path: self._on_solver_finished(algo, path))
-		self.solver_thread.error_occurred.connect(lambda error: self._on_solver_error(algo, error))
+		self.solver_thread = SolverThread(self.state, algo, ucs_mode=ucs_mode)
+		self.solver_thread.result_ready.connect(lambda path, label=solver_label: self._on_solver_finished(label, path))
+		self.solver_thread.error_occurred.connect(lambda error, label=solver_label: self._on_solver_error(label, error))
 		self.solver_thread.finished.connect(self._on_solver_thread_finished)
 		self.solver_thread.start()
 
