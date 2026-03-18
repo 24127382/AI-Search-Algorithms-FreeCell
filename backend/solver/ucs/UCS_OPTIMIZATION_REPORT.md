@@ -1,26 +1,26 @@
 # UCS Optimization Report
 
-This document describes the current UCS implementation and optimization strategy in this project.
+This document summarizes the current Uniform-Cost Search (UCS) implementation and the optimization strategy used in this project.
 
 ## Scope
 
-Only UCS-related implementation is covered:
+This report covers only UCS-related implementation:
 
 - `backend/solver/ucs/ucs.py`
 - `backend/solver/ucs/ucs_utils.py`
 - `backend/solver/ucs/ucs_profile.py`
 - `backend/solver/ucs/__init__.py`
 
-No BFS/DFS/A* logic is modified by this report.
+No BFS, DFS, or A* logic is modified by this report.
 
 ## Current UCS Architecture
 
 ### 1) Compact Search Node Representation
 
-UCS uses compact frontier entries and arena-based metadata instead of storing full node objects in the heap.
+UCS uses compact frontier entries and arena-based metadata rather than storing full node objects in the heap.
 
 - Frontier entry: `(cost, bias, counter, state_id)`
-- Parent/edge chain:
+- Parent/edge chain arenas:
   - `parent_index_arena: list[int]`
   - `edge_move_ids_arena: list[tuple[int, ...]]`
   - `state_id_arena: list[int]`
@@ -33,7 +33,7 @@ Moves are interned and referenced by integer IDs.
 - `move_pool[move_id] -> Move`
 - `encode_edge_moves(...)` / `decode_edge_moves(...)`
 
-This reduces duplicated move-object memory in large trees.
+This approach reduces duplicated move-object memory in large search trees.
 
 ### 3) Duplicate Detection + Cost Pruning
 
@@ -47,7 +47,7 @@ Dominance rule:
 
 ### 4) State Object Cache Separation
 
-`State` objects are kept in `state_cache` only while relevant for expansion, instead of storing them directly in heap nodes.
+`State` objects are stored in `state_cache` only while they remain relevant for expansion, instead of being embedded directly in heap nodes.
 
 ### 5) Optional Bloom Pre-Filter
 
@@ -65,11 +65,11 @@ Any other mode string is rejected.
 
 ## Per-Mode Optimization Policy
 
-Mode policies are defined in `UCS_MODE_PROFILES` (`ucs_profile.py`) and generated from machine limits (CPU/RAM aware baseline).
+Mode policies are defined in `UCS_MODE_PROFILES` (in `ucs_profile.py`) and generated from machine-dependent limits (CPU/RAM-aware baseline).
 
 ### `first` (first-solution fast)
 
-Goal: produce a valid solution as early as possible.
+Goal: return a valid solution as early as possible.
 
 Typical behavior:
 
@@ -80,7 +80,7 @@ Typical behavior:
 
 ### `speed` (speed + cost focus)
 
-Goal: high throughput while preserving better cost quality than `first`.
+Goal: maximize throughput while preserving better cost quality than `first`.
 
 Typical behavior:
 
@@ -91,7 +91,7 @@ Typical behavior:
 
 ### `memory` (exact memory mode)
 
-Goal: correctness-focused mode with memory-aware behavior.
+Goal: correctness-focused behavior with memory-safe settings.
 
 Typical behavior:
 
@@ -114,7 +114,7 @@ If a mode run returns `None`, UCS automatically retries in the next fallback mod
 
 ### Priority Queue Ordering
 
-Primary key remains UCS cost (`g`), with deterministic tie-breaking:
+The primary key remains UCS path cost (`g`), with deterministic tie-breaking:
 
 1. `cost`
 2. progress bias (`_priority_bias`)
@@ -125,14 +125,14 @@ This preserves UCS ordering by cost while improving plateau traversal behavior.
 
 ### Batch Expansion
 
-Nodes sharing the same minimum cost can be expanded in mode-configured batches (`BATCH_EXPANSION_SIZE`) to reduce overhead.
+Nodes that share the same minimum cost can be expanded in mode-configured batches (`BATCH_EXPANSION_SIZE`) to reduce overhead.
 
 ### Partial Expansion and Move Cap (Mode-Configurable)
 
 - `MAX_MOVES_PER_STATE`
 - `PARTIAL_EXPANSION_WIDTH`
 
-Used only where enabled by mode profile.
+These controls are applied only when enabled by the active mode profile.
 
 ## Compaction and Truncation
 
@@ -150,7 +150,7 @@ Inputs include mode-specific keep size and the current frontier anchor.
 
 ## Runtime Progress Logging
 
-When `UCS_RUNTIME_LOG_ENABLED` is true, UCS prints periodic runtime progress:
+When `UCS_RUNTIME_LOG_ENABLED` is `true`, UCS prints periodic runtime progress:
 
 - `mode`
 - elapsed time (`t`)
@@ -163,7 +163,7 @@ Log interval is controlled by `UCS_RUNTIME_LOG_INTERVAL_SECONDS`.
 
 ## Validation
 
-Latest executed command:
+Validation snapshot command:
 
 ```bash
 python -m pytest tests/test_ucs.py -q
@@ -175,5 +175,5 @@ Result:
 
 ## Notes
 
-- The report reflects the current implementation state (mode-based profiles + fallback strategy).
+- This report reflects the current implementation state (mode-based profiles + fallback strategy).
 - Earlier experimental features (e.g., fixed anytime timeout cap) are no longer part of the active design.

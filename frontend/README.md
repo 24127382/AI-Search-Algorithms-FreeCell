@@ -1,13 +1,13 @@
 # Frontend Architecture Guide
 
-This document describes the frontend layer of the FreeCell application, including UI composition, user interaction flow, rendering behavior, and integration with backend search logic.
+This document describes the frontend architecture of the FreeCell application, including UI composition, interaction flow, rendering behavior, and integration points with backend search logic.
 
 ## 1) Frontend Responsibilities
 
 The frontend is responsible for:
 
 - Building and styling the Qt UI (window, board, controls, cards).
-- Translating user actions (click, double-click, drag/drop) into board moves.
+- Translating user actions (click, double-click, drag/drop) into board move requests.
 - Maintaining UI-level session state (selection, move count, status messages).
 - Running solver operations asynchronously and replaying resulting move sequences.
 - Emitting user feedback (`status_changed`, move count updates, win notifications).
@@ -28,7 +28,7 @@ The frontend does **not** implement game rules directly. Legal move generation a
 
 ### `board/`
 - `widget.py`
-  - Concrete board widget that composes all board mixins.
+  - Concrete board widget composed from all board mixins.
   - Owns core board state and lifecycle (`new_game`, difficulty, history).
 - `constants.py`
   - Slot type constants and difficulty constants.
@@ -71,7 +71,7 @@ The frontend does **not** implement game rules directly. Legal move generation a
 
 ## 3) UI Composition and Ownership
 
-## MainWindow
+### MainWindow
 
 `MainWindow` owns two main child widgets:
 
@@ -79,9 +79,9 @@ The frontend does **not** implement game rules directly. Legal move generation a
 2. `BoardWidget` (play area)
 
 Signals from `ControlPanel` are connected to methods on `BoardWidget`.
-Signals from `BoardWidget` are connected back to `MainWindow` status bar and victory dialog.
+Signals from `BoardWidget` are connected back to the `MainWindow` status bar and victory dialog.
 
-## BoardWidget
+### BoardWidget
 
 `BoardWidget` is the main integration object and state owner for gameplay UI.
 
@@ -100,20 +100,20 @@ Important attributes:
   - `_tableau_layouts`
   - `_card_registry`
 
-The mixin composition keeps responsibilities isolated while preserving one concrete widget class.
+Mixin composition keeps responsibilities separated while preserving a single concrete widget class.
 
 ---
 
 ## 4) Runtime Flow
 
-## Startup
+### Startup
 
 1. `main()` launches `QApplication`.
 2. `DifficultyDialog` collects selected difficulty.
 3. `MainWindow` creates `BoardWidget(difficulty=...)`.
-4. `BoardWidget.new_game()` initializes `State` and renders board.
+4. `BoardWidget.new_game()` initializes `State` and renders the board.
 
-## New Game
+### New Game
 
 `BoardWidget.new_game()`:
 
@@ -123,7 +123,7 @@ The mixin composition keeps responsibilities isolated while preserving one concr
 - Calls `_render()`.
 - Emits status message with difficulty and deal number.
 
-## Move Execution (manual)
+### Move Execution (manual)
 
 Typical path:
 
@@ -136,13 +136,13 @@ Typical path:
    - Move count and status are updated.
    - Goal state triggers win signal.
 5. If invalid:
-   - User sees rule-aware error message.
+  - The user sees a rule-aware error message.
 
 ---
 
 ## 5) Signals and Event Wiring
 
-## ControlPanel -> BoardWidget
+### ControlPanel -> BoardWidget
 
 - `new_game_requested` -> `new_game`
 - `restart_requested` -> `restart`
@@ -150,7 +150,7 @@ Typical path:
 - `solve_requested(algo, mode)` -> `solve_with_algo`
 - `auto_foundation_requested` -> `auto_to_foundation`
 
-## BoardWidget -> MainWindow/ControlPanel
+### BoardWidget -> MainWindow/ControlPanel
 
 - `status_changed(str)` -> status bar text
 - `move_count_changed(int)` -> move count label
