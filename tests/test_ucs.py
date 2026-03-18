@@ -29,7 +29,7 @@ def _replay_path(state: State, path):
 	return current
 
 
-@pytest.mark.parametrize("mode", ["fast", "exact"])
+@pytest.mark.parametrize("mode", ["first", "speed", "memory"])
 def test_ucs_solves_near_goal(mode):
 	start_state = _build_near_goal_state()
 	solver = UCSAlgorithm(start_state, mode=mode)
@@ -54,7 +54,7 @@ def test_ucs_returns_empty_path_if_already_goal():
 		foundations=foundations,
 	)
 
-	path = UCSAlgorithm(state, mode="fast").search()
+	path = UCSAlgorithm(state, mode="speed").search()
 
 	assert path == []
 
