@@ -24,17 +24,35 @@ _SUPERMOVE_TO_EMPTY_LIMITS = {
 
 
 def _card_rank(card_id: int) -> int:
-    """Convert a compact card id (1..52) to rank value (1..13)."""
+    """Convert a compact card id to rank value.
+
+    Args:
+        card_id: Card identifier in range 1..52.
+
+    Returns:
+        int: Rank value in range 1..13.
+    """
     return ((card_id - 1) % 13) + 1
 
 
 def _is_red(card_id: int) -> bool:
-    """Return whether a compact card id belongs to a red suit."""
+    """Check whether a compact card id belongs to a red suit.
+
+    Args:
+        card_id: Card identifier in range 1..52.
+
+    Returns:
+        bool: `True` for hearts/diamonds, else `False`.
+    """
     return ((card_id - 1) // 13) < 2
 
 
 def _build_tableau_pair_lookup() -> tuple[tuple[bool, ...], ...]:
-    """Precompute validity for placing one card onto another in tableau."""
+    """Precompute tableau stacking validity lookup table.
+
+    Returns:
+        tuple[tuple[bool, ...], ...]: Matrix indexed by `(moving_id, top_id)`.
+    """
     matrix = [[False] * 53 for _ in range(53)]
     for card_id in range(1, 53):
         rank = _card_rank(card_id)
@@ -49,14 +67,31 @@ def _build_tableau_pair_lookup() -> tuple[tuple[bool, ...], ...]:
 _TABLEAU_PAIR_VALID = _build_tableau_pair_lookup()
 
 def can_move_to_foundation(card: Card, foundation: Tuple[Card, ...], f_idx: int) -> bool:
-    """Check if card can move to foundation (same suit, rank+1, matches assigned foundation index)."""
+    """Check whether a card can be placed onto a foundation pile.
+
+    Args:
+        card: Card to place.
+        foundation: Current target foundation stack.
+        f_idx: Foundation suit index.
+
+    Returns:
+        bool: `True` when move is legal.
+    """
     if card.suit_idx != f_idx:
         return False
 
     return card.rank_val == len(foundation) + 1
 
 def is_safe_to_foundation(state: State, card: Card) -> bool:
-    """Check if moving a card to the foundation is universally safe."""
+    """Check whether moving a card to foundation is strategically safe.
+
+    Args:
+        state: Current board state.
+        card: Candidate card to move.
+
+    Returns:
+        bool: `True` when move is considered safe.
+    """
     rank_val = card.rank_val
     if rank_val <= 2:
         return True # Aces and Twos are always safe
@@ -68,7 +103,15 @@ def is_safe_to_foundation(state: State, card: Card) -> bool:
     return True
 
 def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
-    """Check if card can move to tableau column (rank-1, opposite color)."""
+    """Check whether a card can be placed on a tableau column.
+
+    Args:
+        card: Moving card.
+        tableau_col: Destination tableau column.
+
+    Returns:
+        bool: `True` when destination accepts the card.
+    """
     if not tableau_col:
         return True
 
@@ -78,7 +121,14 @@ def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
 
 @lru_cache(maxsize=50000)
 def _get_movable_sequences_cached(column: Tuple[Card, ...]) -> Tuple[Tuple[Card, ...], ...]:
-    """Return all descending alternating-color tails that can move as a block."""
+    """Return all movable suffix sequences for a tableau column.
+
+    Args:
+        column: Tableau column cards from bottom to top.
+
+    Returns:
+        Tuple[Tuple[Card, ...], ...]: Valid movable sequences from shortest to longest.
+    """
     if not column:
         return tuple()
 
@@ -99,12 +149,27 @@ def _get_movable_sequences_cached(column: Tuple[Card, ...]) -> Tuple[Tuple[Card,
 
 
 def get_movable_sequences(column: Tuple[Card, ...]) -> Tuple[Tuple[Card, ...], ...]:
-    """Extract all valid movable sequences from top of column."""
+    """Extract valid movable sequences from a tableau column.
+
+    Args:
+        column: Tableau column cards from bottom to top.
+
+    Returns:
+        Tuple[Tuple[Card, ...], ...]: Movable sequences from top.
+    """
     return _get_movable_sequences_cached(column)
 
 
 def _is_valid_sequence_pair(card1: Card, card2: Card) -> bool:
-    """Check if card1 (below) and card2 (above) form valid sequence pair."""
+    """Check whether two adjacent cards form a legal descending pair.
+
+    Args:
+        card1: Lower card in tableau.
+        card2: Upper card in tableau.
+
+    Returns:
+        bool: `True` when pair is alternating-color and descending by one.
+    """
     return _TABLEAU_PAIR_VALID[card2.to_int()][card1.to_int()]
 
 
@@ -114,7 +179,17 @@ def find_valid_destinations(
     from_pos: Tuple[str, int],
     max_seq_len: int,
 ) -> List[Move]:
-    """Build all legal destination moves for a source sequence in one state."""
+    """Enumerate all legal destinations for a source sequence.
+
+    Args:
+        state: Current board state.
+        sequence: Source card sequence to move.
+        from_pos: Source position tuple.
+        max_seq_len: Maximum movable sequence length in current state.
+
+    Returns:
+        List[Move]: All legal destination moves for the source sequence.
+    """
     if len(sequence) > max_seq_len:
         return []
 
@@ -170,7 +245,14 @@ def find_valid_destinations(
 
 
 def get_max_sequence_length(state: State) -> int:
-    """Calculate max sequence length using supermove rule: K = (F + 1) * 2^E."""
+    """Compute maximum movable sequence length for current state.
+
+    Args:
+        state: Current board state.
+
+    Returns:
+        int: Supermove limit, `K = (F + 1) * 2^E`.
+    """
     empty_freecells = sum(1 for cell in state.freecells if cell is None)
     empty_tableau_cols = sum(1 for col in state.tableau if len(col) == 0)
 
@@ -178,7 +260,14 @@ def get_max_sequence_length(state: State) -> int:
 
 
 def get_max_sequence_to_empty_tableau(state: State) -> int:
-    """Max sequence length when destination tableau is empty: (F + 1) * 2^(E - 1)."""
+    """Compute max sequence length when destination tableau is empty.
+
+    Args:
+        state: Current board state.
+
+    Returns:
+        int: Empty-destination supermove limit, `(F + 1) * 2^(E - 1)`.
+    """
     empty_freecells = sum(1 for cell in state.freecells if cell is None)
     empty_tableau_cols = sum(1 for col in state.tableau if len(col) == 0)
     return _SUPERMOVE_TO_EMPTY_LIMITS[(empty_freecells, empty_tableau_cols)]

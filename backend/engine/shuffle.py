@@ -18,7 +18,14 @@ _SOLVED_GAME_NUMBERS_BY_DIFFICULTY: dict[str, tuple[int, ...]] = {
 
 
 def _microsoft_rand_stream(seed: int) -> tuple[int, ...]:
-	"""Return 52 outputs from the Microsoft C runtime rand() sequence."""
+	"""Generate the first 52 values of Microsoft CRT `rand()` sequence.
+
+	Args:
+		seed: Deal number used as random seed.
+
+	Returns:
+		tuple[int, ...]: Sequence of 52 pseudo-random integers.
+	"""
 	state = seed & _MS_RAND_MASK
 	values: list[int] = []
 	for _ in range(52):
@@ -27,7 +34,17 @@ def _microsoft_rand_stream(seed: int) -> tuple[int, ...]:
 	return tuple(values)
 
 def microsoft_shuffled_deck(deal_number: int) -> tuple[Card, ...]:
-	"""Shuffle using the classic Microsoft FreeCell deal algorithm."""
+	"""Build a deck shuffled with classic Microsoft FreeCell rules.
+
+	Args:
+		deal_number: Microsoft deal number.
+
+	Returns:
+		tuple[Card, ...]: Shuffled 52-card deck.
+
+	Raises:
+		ValueError: If `deal_number` is negative.
+	"""
 	if deal_number < 0:
 		raise ValueError("deal_number must be non-negative")
 
@@ -44,7 +61,17 @@ def microsoft_shuffled_deck(deal_number: int) -> tuple[Card, ...]:
 	return tuple(deck)
 
 def _to_tableau(cards: Sequence[Card]) -> tuple[tuple[Card, ...], ...]:
-	"""Deal a 52-card sequence into 8 tableau columns."""
+	"""Distribute a 52-card sequence into eight tableau columns.
+
+	Args:
+		cards: Ordered card sequence.
+
+	Returns:
+		tuple[tuple[Card, ...], ...]: Tableau columns in deal order.
+
+	Raises:
+		ValueError: If card count is not exactly 52.
+	"""
 	if len(cards) != 52:
 		raise ValueError(f"FreeCell requires 52 cards, got {len(cards)}")
 
@@ -54,7 +81,17 @@ def _to_tableau(cards: Sequence[Card]) -> tuple[tuple[Card, ...], ...]:
 	return tuple(tuple(column) for column in tableau)
 
 def _normalize_difficulty(difficulty: str) -> str:
-	"""Normalize and validate difficulty labels for curated solved deals."""
+	"""Normalize and validate difficulty string.
+
+	Args:
+		difficulty: Input difficulty label.
+
+	Returns:
+		str: Canonical lowercase difficulty.
+
+	Raises:
+		ValueError: If difficulty is not one of supported levels.
+	"""
 	normalized = (difficulty or "medium").strip().lower()
 	if normalized not in _DIFFICULTY_LEVELS:
 		valid = ", ".join(_DIFFICULTY_LEVELS)
@@ -63,7 +100,14 @@ def _normalize_difficulty(difficulty: str) -> str:
 
 
 def deal(difficulty: str = "medium") -> tuple[int, tuple[tuple[Card, ...], ...]]:
-	"""Deal one solved game by difficulty and return (game_number, tableau)."""
+	"""Pick a curated solved deal and return its tableau.
+
+	Args:
+		difficulty: Difficulty bucket to sample from.
+
+	Returns:
+		tuple[int, tuple[tuple[Card, ...], ...]]: Chosen game number and tableau.
+	"""
 	normalized = _normalize_difficulty(difficulty)
 	game_number = Random().choice(_SOLVED_GAME_NUMBERS_BY_DIFFICULTY[normalized])
 	tableau = _to_tableau(microsoft_shuffled_deck(game_number))
@@ -71,13 +115,27 @@ def deal(difficulty: str = "medium") -> tuple[int, tuple[tuple[Card, ...], ...]]
 
 
 def deal_random() -> tuple[tuple[Card, ...], ...]:
-	"""Deal a fully random game layout without a Microsoft deal number."""
+	"""Deal a random FreeCell tableau without a deal number.
+
+	Returns:
+		tuple[tuple[Card, ...], ...]: Randomly shuffled tableau.
+	"""
 	deck = [Card(suit=suit, rank=rank) for suit in VALID_SUITS for rank in VALID_RANK]
 	Random().shuffle(deck)
 	return _to_tableau(deck)
 
 def deal_by_game_number(game_number: int) -> tuple[tuple[Card, ...], ...]:
-	"""Deal a specific game number using the Microsoft shuffle algorithm."""
+	"""Build tableau for a specific Microsoft deal number.
+
+	Args:
+		game_number: Microsoft deal number.
+
+	Returns:
+		tuple[tuple[Card, ...], ...]: Tableau for this deal.
+
+	Raises:
+		ValueError: If `game_number` is negative.
+	"""
 	if game_number < 0:
 		raise ValueError("game_number must be non-negative")
 	tableau = _to_tableau(microsoft_shuffled_deck(game_number))

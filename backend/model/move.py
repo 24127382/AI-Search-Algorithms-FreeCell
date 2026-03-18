@@ -17,7 +17,15 @@ class MoveType(str, Enum):
 
 @dataclass(frozen=True)
 class Move:
-    """Represents a legal move in the game state graph."""
+    """Represent one legal move in the game state graph.
+
+    Attributes:
+        move_type: Move category enum value.
+        card: Base card associated with the move.
+        from_pos: Source tuple `(slot_type, index)`.
+        to_pos: Destination tuple `(slot_type, index)`.
+        sequence: Optional moved sequence for tableau multi-card moves.
+    """
 
     move_type: MoveType
     card: Card

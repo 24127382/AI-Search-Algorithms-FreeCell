@@ -13,13 +13,27 @@ from backend.rule.rules import (
 
 
 def _auto_foundation_priority(move: Move) -> tuple[int, int, int, int]:
-    """Provide a stable priority key for deterministic auto-foundation selection."""
+    """Build a deterministic sort key for safe foundation candidates.
+
+    Args:
+        move: Candidate move that sends one card to a foundation.
+
+    Returns:
+        Tuple[int, int, int, int]: Priority key used by `min`.
+    """
     from_type_priority = 0 if move.from_pos[0] == 'freecell' else 1
     return (move.card.rank_val, from_type_priority, move.from_pos[1], move.to_pos[1])
 
 
 def _move_priority(move: Move) -> tuple[int, int, int, int, int]:
-    """Rank candidate moves so search explores stronger tactical moves first."""
+    """Build a deterministic sort key for move ordering.
+
+    Args:
+        move: Candidate legal move.
+
+    Returns:
+        Tuple[int, int, int, int, int]: Priority key where smaller means earlier.
+    """
     sequence_len = len(move.sequence) if move.sequence else 1
     if move.to_pos[0] == 'foundation':
         group = 0
@@ -36,7 +50,15 @@ def _move_priority(move: Move) -> tuple[int, int, int, int, int]:
 
 
 def _is_immediate_undo(candidate: Move, last_move: Optional[Move]) -> bool:
-    """Detect simple one-card reversals to reduce unproductive backtracking."""
+    """Check whether a move immediately undoes the previous move.
+
+    Args:
+        candidate: Move being considered.
+        last_move: Previously applied move, if any.
+
+    Returns:
+        bool: `True` when candidate is a direct single-card reverse move.
+    """
     if last_move is None:
         return False
     if candidate.from_pos != last_move.to_pos or candidate.to_pos != last_move.from_pos:
@@ -51,7 +73,15 @@ def _is_immediate_undo(candidate: Move, last_move: Optional[Move]) -> bool:
 
 
 def _safe_foundation_move_from_tableau(state: State, col_idx: int) -> Optional[Move]:
-    """Return a tableau->foundation move when it is legal and strategy-safe."""
+    """Build a safe tableau-to-foundation move for one column.
+
+    Args:
+        state: Current board state.
+        col_idx: Source tableau column index.
+
+    Returns:
+        Optional[Move]: Safe legal move, or `None` when unavailable.
+    """
     column = state.tableau[col_idx]
     if not column:
         return None
@@ -73,7 +103,15 @@ def _safe_foundation_move_from_tableau(state: State, col_idx: int) -> Optional[M
 
 
 def _safe_foundation_move_from_freecell(state: State, cell_idx: int) -> Optional[Move]:
-    """Return a freecell->foundation move when it is legal and strategy-safe."""
+    """Build a safe freecell-to-foundation move for one freecell.
+
+    Args:
+        state: Current board state.
+        cell_idx: Source freecell index.
+
+    Returns:
+        Optional[Move]: Safe legal move, or `None` when unavailable.
+    """
     card = state.freecells[cell_idx]
     if card is None:
         return None
@@ -94,7 +132,14 @@ def _safe_foundation_move_from_freecell(state: State, cell_idx: int) -> Optional
 
 
 def _find_forced_foundation_move(state: State) -> Optional[Move]:
-    """Find one deterministic safe move to foundation if any exists."""
+    """Select one deterministic safe move to foundation when possible.
+
+    Args:
+        state: Current board state.
+
+    Returns:
+        Optional[Move]: Chosen safe move, or `None` if no safe move exists.
+    """
     candidates = []
 
     for col_idx in range(len(state.tableau)):
@@ -113,7 +158,14 @@ def _find_forced_foundation_move(state: State) -> Optional[Move]:
 
 
 def apply_forced_foundation_closure(state: State) -> tuple[State, Tuple[Move, ...]]:
-    """Repeatedly apply safe foundation moves until no forced move remains."""
+    """Apply all consecutive forced safe-foundation moves.
+
+    Args:
+        state: State to start closure from.
+
+    Returns:
+        tuple[State, Tuple[Move, ...]]: Final state and moves applied during closure.
+    """
     current_state = state
     forced_moves: list[Move] = []
 
@@ -128,7 +180,16 @@ def apply_forced_foundation_closure(state: State) -> tuple[State, Tuple[Move, ..
 
 
 def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[Move] = None) -> List[Move]:
-    """Generate legal moves, optionally pruning to one forced safe foundation move."""
+    """Generate legal moves for the current state.
+
+    Args:
+        state: Current board state.
+        prune_safe: Whether to collapse safe-foundation branches to one move.
+        last_move: Optional previous move used to prune immediate undo actions.
+
+    Returns:
+        List[Move]: Deterministically ordered legal moves.
+    """
     moves = []
 
     max_seq_len = get_max_sequence_length(state)
@@ -160,7 +221,18 @@ def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[M
 
 
 def _apply_single_move(state: State, move: Move) -> State:
-    """Apply one already-validated move and return a new immutable state."""
+    """Apply one validated move and return a new immutable state.
+
+    Args:
+        state: Source state.
+        move: Legal move to apply.
+
+    Returns:
+        State: Next state after applying the move.
+
+    Raises:
+        ValueError: If tableau move sequence metadata is missing or inconsistent.
+    """
     new_tableau = [list(col) for col in state.tableau]
     new_freecells = list(state.freecells)
     new_foundations = [list(f) for f in state.foundations]
@@ -203,7 +275,16 @@ def _apply_single_move(state: State, move: Move) -> State:
 
 
 def apply_move(state: State, move: Move, collapse_forced: bool = False) -> State:
-    """Apply one move and optionally collapse subsequent forced foundation moves."""
+    """Apply one move with optional forced-foundation closure.
+
+    Args:
+        state: Source state.
+        move: Legal move to apply.
+        collapse_forced: Whether to apply forced safe-foundation chain after move.
+
+    Returns:
+        State: Resulting state.
+    """
     next_state = _apply_single_move(state, move)
     if not collapse_forced:
         return next_state
@@ -212,6 +293,14 @@ def apply_move(state: State, move: Move, collapse_forced: bool = False) -> State
 
 
 def apply_move_with_forced(state: State, move: Move) -> tuple[State, Tuple[Move, ...]]:
-    """Apply one move and always return the forced-foundation closure sequence."""
+    """Apply one move and compute forced-foundation closure.
+
+    Args:
+        state: Source state.
+        move: Legal move to apply.
+
+    Returns:
+        tuple[State, Tuple[Move, ...]]: Result state and forced moves applied.
+    """
     next_state = _apply_single_move(state, move)
     return apply_forced_foundation_closure(next_state)

@@ -8,13 +8,22 @@ class BloomFilter:
 	"""Simple integer bloom filter used for optional state pre-pruning."""
 
 	def __init__(self, bit_count: int, hash_count: int):
-		"""Allocate a compact bitset and choose the number of hash probes."""
+		"""Allocate bloom bitset and choose hash probe count.
+
+		Args:
+			bit_count: Number of bits in filter.
+			hash_count: Number of hash probes per item.
+		"""
 		self.bit_count = max(1024, int(bit_count))
 		self.hash_count = max(2, int(hash_count))
 		self._bytes = bytearray((self.bit_count + 7) // 8)
 
 	def _indexes(self, value: int):
-		"""Yield bloom bit indexes for a value using salted hash probes."""
+		"""Yield bloom bit indexes for a value.
+
+		Args:
+			value: Integer key to hash.
+		"""
 		mask = self.bit_count - 1 if (self.bit_count & (self.bit_count - 1)) == 0 else None
 		for salt in range(self.hash_count):
 			h = hash((value, salt * 0x9E3779B1))
@@ -24,12 +33,23 @@ class BloomFilter:
 			yield idx
 
 	def add(self, value: int):
-		"""Insert a value into the bloom filter."""
+		"""Insert one integer key into the bloom filter.
+
+		Args:
+			value: Integer key to insert.
+		"""
 		for idx in self._indexes(value):
 			self._bytes[idx >> 3] |= (1 << (idx & 7))
 
 	def maybe_contains(self, value: int) -> bool:
-		"""Return False when definitely absent, True when possibly present."""
+		"""Check probable membership for an integer key.
+
+		Args:
+			value: Integer key to test.
+
+		Returns:
+			bool: `False` means definitely absent, `True` means possibly present.
+		"""
 		for idx in self._indexes(value):
 			if not (self._bytes[idx >> 3] & (1 << (idx & 7))):
 				return False
@@ -37,7 +57,14 @@ class BloomFilter:
 
 
 def state_id(state):
-	"""Return a stable, compact state identifier across legacy/new state models."""
+	"""Return stable compact identifier for a state object.
+
+	Args:
+		state: State-like object.
+
+	Returns:
+		int: Stable state identifier.
+	"""
 	board_code = getattr(state, "board_code", None)
 	if board_code is not None:
 		return board_code
@@ -54,7 +81,14 @@ def state_id(state):
 
 
 def ucs_move_cost(move):
-	"""Assign domain-specific edge weights used by UCS."""
+	"""Compute UCS edge cost for one move.
+
+	Args:
+		move: Move object.
+
+	Returns:
+		int: Edge cost used by UCS.
+	"""
 	if move.to_pos[0] == "foundation":
 		return 1
 	if move.from_pos[0] == "freecell" and move.to_pos[0] == "tableau":
@@ -67,7 +101,14 @@ def ucs_move_cost(move):
 
 
 def move_signature(move) -> Tuple[str, int, str, int, str, int, Tuple[int, ...]]:
-	"""Build a hashable signature so equivalent moves can be interned."""
+	"""Build hashable signature for move interning.
+
+	Args:
+		move: Move object to encode.
+
+	Returns:
+		Tuple[str, int, str, int, str, int, Tuple[int, ...]]: Stable signature.
+	"""
 	sequence_ids = tuple(card.to_int() for card in (move.sequence or (move.card,)))
 	return (
 		move.move_type.value,
@@ -81,7 +122,16 @@ def move_signature(move) -> Tuple[str, int, str, int, str, int, Tuple[int, ...]]
 
 
 def intern_move(move, move_index_by_signature: Dict[Tuple[str, int, str, int, str, int, Tuple[int, ...]], int], move_pool: List[object]) -> int:
-	"""Store move once and reuse integer ids for repeated references."""
+	"""Intern move and return integer identifier.
+
+	Args:
+		move: Move object to intern.
+		move_index_by_signature: Signature-to-id mapping.
+		move_pool: Move pool indexed by id.
+
+	Returns:
+		int: Interned move id.
+	"""
 	signature = move_signature(move)
 	existing_id = move_index_by_signature.get(signature)
 	if existing_id is not None:
@@ -94,12 +144,29 @@ def intern_move(move, move_index_by_signature: Dict[Tuple[str, int, str, int, st
 
 
 def encode_edge_moves(edge_moves: Iterable[object], move_index_by_signature: Dict[Tuple[str, int, str, int, str, int, Tuple[int, ...]], int], move_pool: List[object]) -> Tuple[int, ...]:
-	"""Convert a tuple of edge moves into interned move ids."""
+	"""Convert edge move objects into interned id tuple.
+
+	Args:
+		edge_moves: Iterable of edge move objects.
+		move_index_by_signature: Signature-to-id mapping.
+		move_pool: Move pool indexed by id.
+
+	Returns:
+		Tuple[int, ...]: Interned edge move ids.
+	"""
 	return tuple(intern_move(move, move_index_by_signature, move_pool) for move in edge_moves)
 
 
 def decode_edge_moves(edge_move_ids: Tuple[int, ...], move_pool: List[object]) -> Tuple[object, ...]:
-	"""Reconstruct edge moves from interned ids."""
+	"""Decode interned edge ids back into move objects.
+
+	Args:
+		edge_move_ids: Tuple of interned move ids.
+		move_pool: Move pool indexed by id.
+
+	Returns:
+		Tuple[object, ...]: Decoded move objects.
+	"""
 	return tuple(move_pool[move_id] for move_id in edge_move_ids)
 
 
@@ -114,7 +181,19 @@ def compact_ucs_structures(
 	state_id_arena,
 	state_cache,
 ):
-	"""Compact UCS arenas/maps to keep only frontier-reachable history."""
+	"""Compact UCS arenas/maps to keep frontier-reachable history.
+
+	Args:
+		frontier: Priority queue of frontier nodes.
+		current_state_id: Currently expanded state id.
+		keep_size: Number of frontier nodes to keep.
+		best_cost: Best known cost map.
+		best_node_index: State id to arena index map.
+		parent_index_arena: Parent index arena.
+		edge_move_ids_arena: Edge move id arena.
+		state_id_arena: Arena state id list.
+		state_cache: Cached state objects.
+	"""
 	best_frontier_nodes = nsmallest(keep_size, frontier)
 	keep_frontier_ids = {node[-1] for node in best_frontier_nodes}
 	keep_frontier_ids.add(current_state_id)

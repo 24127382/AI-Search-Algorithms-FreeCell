@@ -6,7 +6,11 @@ import ctypes
 
 
 def _total_ram_gb() -> float:
-	"""Best-effort detection of total physical RAM in gigabytes."""
+	"""Detect total physical RAM in gigabytes.
+
+	Returns:
+		float: Total RAM in GB, or `0.0` when unavailable.
+	"""
 	try:
 		if platform.system() == "Windows":
 			class MEMORYSTATUSEX(ctypes.Structure):
@@ -38,7 +42,11 @@ def _total_ram_gb() -> float:
 
 
 def _machine_limits() -> dict:
-	"""Select conservative search limits based on CPU and available RAM."""
+	"""Select machine-dependent runtime limits.
+
+	Returns:
+		dict: Limit profile with frontier/visited/bloom settings.
+	"""
 	cpu_count = os.cpu_count() or 4
 	ram_gb = _total_ram_gb()
 
@@ -93,7 +101,14 @@ def _machine_limits() -> dict:
 
 
 def _build_mode_profiles(limits: dict) -> dict:
-	"""Translate machine limits into mode-specific UCS configuration maps."""
+	"""Build mode-specific UCS config maps from machine limits.
+
+	Args:
+		limits: Machine-dependent hard limits.
+
+	Returns:
+		dict: UCS mode profile dictionary.
+	"""
 	max_visited = limits["MAX_VISITED"]
 	max_frontier = limits["MAX_FRONTIER"]
 	keep_frontier = limits["KEEP_FRONTIER"]

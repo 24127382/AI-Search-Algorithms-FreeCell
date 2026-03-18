@@ -10,7 +10,12 @@ LOCATIONS = ["tableau", "freecell", "foundation"]
 
 @dataclass(frozen=True, order=True)
 class Card:
-    """Playing card with validated suit/rank and cached numeric fields."""
+    """Immutable playing card with validated suit/rank metadata.
+
+    Attributes:
+        suit: Card suit string.
+        rank: Card rank label.
+    """
 
     suit: str
     rank: str
@@ -21,6 +26,11 @@ class Card:
     _id: int = field(init=False, repr=False, compare=False)
 
     def __post_init__(self):
+        """Validate input fields and precompute cached numeric attributes.
+
+        Raises:
+            ValueError: If suit or rank is outside allowed constants.
+        """
         if self.rank not in VALID_RANK:
             raise ValueError(f"Invalid rank: {self.rank}")
         if self.suit not in VALID_SUITS:
@@ -36,4 +46,9 @@ class Card:
         object.__setattr__(self, "_id", suit_idx * 13 + rank_val)
 
     def to_int(self) -> int:
+        """Return compact integer id for this card.
+
+        Returns:
+            int: Stable card id in range 1..52.
+        """
         return self._id

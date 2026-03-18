@@ -10,9 +10,20 @@ class AStarAlgorithm:
     """Placeholder A* solver interface."""
 
     def __init__(self, game_state):
-        """Store initial game state for A* search."""
+        """Store initial game state for A* search.
+
+        Args:
+            game_state: Initial board state.
+        """
         self.game_state = game_state
 
     def search(self, heuristic_func=None):
-        """Execute A* and return a move list once implemented."""
+        """Execute A* search.
+
+        Args:
+            heuristic_func: Optional heuristic callable.
+
+        Returns:
+            object: Planned move path once implementation is provided.
+        """
         pass
