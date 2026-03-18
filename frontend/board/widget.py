@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from backend.engine.shuffle import deal
+from backend.engine.shuffle import deal, deal_by_game_number
 from backend.model.state import State
 from frontend.board.constants import DIFFICULTY_LEVELS
 from frontend.board.move_interaction_mixin import BoardMoveInteractionMixin
@@ -40,8 +40,9 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.new_game()
 
 	def _build_initial_state(self) -> State:
-		deal_number, tableau = deal(self.difficulty)
-		self.current_deal_number = deal_number
+		# deal_number, tableau = deal(self.difficulty)
+		tableau = deal_by_game_number(1)
+		self.current_deal_number = 1
 		return State.from_lists(tableau=tableau, freecells=[None] * 4, foundations=[[] for _ in range(4)])
 
 	def set_difficulty(self, difficulty: str):
