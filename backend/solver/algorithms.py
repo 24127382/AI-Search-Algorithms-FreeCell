@@ -8,11 +8,12 @@ from backend.solver.ucs.ucs import UCSAlgorithm
 from enum import Enum
 
 class AlgorithmMode(Enum):
-    FAST = "fast"
-    EXACT = "exact"
+    FIRST = "first"
+    SPEED = "speed"
+    MEMORY = "memory"
 
 class SearchAlgorithm:
-    def __init__(self, game_state, mode=AlgorithmMode.FAST.value):
+    def __init__(self, game_state, mode=AlgorithmMode.SPEED.value):
         self.game_state = game_state
         self._handlers = {
             "BFS": BFSAlgorithm(self.game_state).search,
