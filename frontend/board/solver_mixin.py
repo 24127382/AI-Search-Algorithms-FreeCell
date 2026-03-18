@@ -1,3 +1,5 @@
+"""Solver orchestration, replay, and game control helpers for the board."""
+
 import time
 from copy import deepcopy
 
@@ -8,8 +10,19 @@ from frontend.shared.qt import QTimer
 
 
 class BoardSolverMixin:
+	"""Provides undo/restart and background-solver integration behaviors."""
+
 	@staticmethod
 	def _solver_label(algo: str, ucs_mode: str) -> str:
+		"""Build user-friendly solver label.
+
+		Args:
+			algo: Solver key.
+			ucs_mode: UCS mode key.
+
+		Returns:
+			str: Display label.
+		"""
 		if algo == "UCS":
 			mode_label = {
 				"first": "First Solution",
@@ -22,6 +35,7 @@ class BoardSolverMixin:
 		return algo
 
 	def undo(self):
+		"""Revert one move from history if available."""
 		if not self.history:
 			self._emit_status("No moves to undo.")
 			return
@@ -32,6 +46,12 @@ class BoardSolverMixin:
 		self._emit_status("Undid 1 move.")
 
 	def solve_with_algo(self, algo: str, ucs_mode: str = "speed"):
+		"""Start background solve job and prepare replay callbacks.
+
+		Args:
+			algo: Solver key to run.
+			ucs_mode: UCS mode key when `algo` is UCS.
+		"""
 		if self.state is None:
 			return
 		if self.is_solving:
@@ -53,15 +73,28 @@ class BoardSolverMixin:
 		self.solver_thread.start()
 
 	def _on_solver_error(self, algo: str, error: str):
+		"""Handle solver-thread failures and reset solving state.
+
+		Args:
+			algo: Solver label.
+			error: Error message from solver thread.
+		"""
 		self._emit_status(f"{algo} error: {error}")
 		self.is_solving = False
 		self.solver_thread = None
 
 	def _on_solver_thread_finished(self):
+		"""Clear thread reference after worker exits."""
 		self.is_solving = False
 		self.solver_thread = None
 
 	def _on_solver_finished(self, algo, path):
+		"""Receive solved path and start timed replay animation.
+
+		Args:
+			algo: Solver label.
+			path: Solved move sequence.
+		"""
 		elapsed = time.perf_counter() - self._solve_started_at if self._solve_started_at else 0.0
 		if not path:
 			self._emit_status(f"{algo} failed to find a solution after {elapsed:.1f}s.")
@@ -75,6 +108,7 @@ class BoardSolverMixin:
 		self.solve_timer.start(140)
 
 	def _replay_next_solver_move(self):
+		"""Apply one solver move per timer tick until path is exhausted."""
 		if not hasattr(self, "solve_path") or not self.solve_path:
 			if hasattr(self, "solve_timer") and self.solve_timer:
 				self.solve_timer.stop()
@@ -96,6 +130,7 @@ class BoardSolverMixin:
 			self._emit_status("You won!")
 	
 	def restart(self):
+		"""Restore board to initial deal and clear transient runtime state."""
 		if self.state is None:
 			return
 		if not getattr(self, "initial_state", None):
@@ -116,6 +151,7 @@ class BoardSolverMixin:
 		self._emit_status("Game restarted.")
 
 	def auto_to_foundation(self):
+		"""Execute first legal move that sends a card to foundation."""
 		if self.state is None:
 			return
 

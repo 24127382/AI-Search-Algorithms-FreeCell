@@ -1,3 +1,5 @@
+"""Main application window and difficulty selection dialog."""
+
 import sys
 
 from frontend.board.constants import DIFFICULTY_LEVELS
@@ -7,7 +9,14 @@ from frontend.shared.qt import QApplication, QDialog, QHBoxLayout, QLabel, QMain
 
 
 class DifficultyDialog(QDialog):
+	"""Modal dialog that lets the player select a starting difficulty."""
+
 	def __init__(self, parent=None):
+		"""Initialize dialog defaults and build difficulty buttons.
+
+		Args:
+			parent: Optional parent widget.
+		"""
 		super().__init__(parent)
 		self.selected_difficulty = "medium"
 		self.setWindowTitle("Choose Difficulty")
@@ -39,6 +48,7 @@ class DifficultyDialog(QDialog):
 		self._build_ui()
 
 	def _build_ui(self):
+		"""Construct title and per-difficulty action buttons."""
 		layout = QVBoxLayout(self)
 		layout.setContentsMargins(18, 16, 18, 16)
 		layout.setSpacing(12)
@@ -56,12 +66,24 @@ class DifficultyDialog(QDialog):
 		layout.addLayout(button_row)
 
 	def _choose_level(self, level: str):
+		"""Persist selected level and close dialog.
+
+		Args:
+			level: Difficulty key selected by user.
+		"""
 		self.selected_difficulty = level
 		self.accept()
 
 
 class MainWindow(QMainWindow):
+	"""Top-level container that hosts controls and the game board."""
+
 	def __init__(self, difficulty: str = "medium"):
+		"""Create main window with initialized board and control panel.
+
+		Args:
+			difficulty: Initial difficulty label for board setup.
+		"""
 		super().__init__()
 		self.setWindowTitle(f"FreeCell - {QT_API}")
 		self.resize(1000, 700)
@@ -94,6 +116,7 @@ class MainWindow(QMainWindow):
 		self.statusBar().showMessage("Ready.")
 
 	def _connect_signals(self):
+		"""Wire control actions to board operations and status updates."""
 		self.controls.new_game_requested.connect(self.board.new_game)
 		self.controls.restart_requested.connect(self.board.restart)
 		self.controls.undo_requested.connect(self.board.undo)
@@ -105,10 +128,16 @@ class MainWindow(QMainWindow):
 		self.board.game_won.connect(self._on_game_won)
 
 	def _on_game_won(self):
+		"""Display a victory dialog when the board emits a win event."""
 		QMessageBox.information(self, "Victory", "You have completed the FreeCell game!")
 
 
 def main():
+	"""Run Qt application after user selects a difficulty.
+
+	Returns:
+		None: This function exits via `sys.exit`.
+	"""
 	app = QApplication(sys.argv)
 	difficulty_dialog = DifficultyDialog()
 	if difficulty_dialog.exec() != QDialog.DialogCode.Accepted:

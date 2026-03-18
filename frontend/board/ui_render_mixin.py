@@ -1,3 +1,5 @@
+"""Board rendering mixin that maps state objects to Qt widgets."""
+
 from backend.model.card import VALID_SUITS
 from backend.rule.rules import get_movable_sequences
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
@@ -6,7 +8,21 @@ from frontend.card.widget import CardWidget
 from frontend.shared.animation import fade_in
 
 class BoardUiRenderMixin:
+	"""Render freecells, foundations, tableau, and card widget transitions."""
+
 	def _update_card_widget(self, card, new_parent, new_pos, pos_tuple, payload_str, is_draggable, drag_sequence, is_selected):
+		"""Create/reparent/move one `CardWidget` and update interaction state.
+
+		Args:
+			card: Card model instance.
+			new_parent: Target parent widget.
+			new_pos: Target widget position.
+			pos_tuple: Logical card position tuple.
+			payload_str: Drag payload string.
+			is_draggable: Whether card should be draggable.
+			drag_sequence: Sequence used for stacked drag preview.
+			is_selected: Whether card should render selected highlight.
+		"""
 		from frontend.shared.animation import animate_move
 		cw = self._card_registry.get(card)
 		if isinstance(new_pos, tuple):
@@ -48,6 +64,7 @@ class BoardUiRenderMixin:
 		cw.raise_()
 
 	def _render(self):
+		"""Render full board from current state and emit updated move count."""
 		if self.state is None:
 			return
 
@@ -63,9 +80,15 @@ class BoardUiRenderMixin:
 		self.move_count_changed.emit(self.move_count)
 
 	def _emit_status(self, message: str):
+		"""Forward status text through widget-level status signal.
+
+		Args:
+			message: Status text to emit.
+		"""
 		self.status_changed.emit(message)
 
 	def _render_freecells(self):
+		"""Render freecell slots and corresponding card widgets."""
 		for idx, button in enumerate(self._freecell_buttons):
 			card = self.state.freecells[idx]
 			selected = self.selected_source == (SLOT_FREECELL, idx)
@@ -86,6 +109,7 @@ class BoardUiRenderMixin:
 			)
 
 	def _render_foundations(self):
+		"""Render foundation slots, suit targets, and stacked cards."""
 		for idx, button in enumerate(self._foundation_buttons):
 			foundation_cards = self.state.foundations[idx]
 			top_card = foundation_cards[-1] if foundation_cards else None
@@ -113,6 +137,7 @@ class BoardUiRenderMixin:
 			)
 
 	def _render_tableau(self):
+		"""Render tableau columns, movable cards, and column selection indicators."""
 		for col_idx, col_cards in enumerate(self.state.tableau):
 			movable_bases = {sequence[0] for sequence in get_movable_sequences(col_cards)}
 
@@ -139,6 +164,17 @@ class BoardUiRenderMixin:
 			self._tableau_buttons[col_idx].setStyleSheet(f"border: {border};")
 
 	def _is_selected_tableau_card(self, col_idx: int, card_idx: int, is_draggable: bool, is_top: bool) -> bool:
+		"""Check whether tableau card should show selected highlight.
+
+		Args:
+			col_idx: Tableau column index.
+			card_idx: Card index in tableau column.
+			is_draggable: Whether card is currently draggable.
+			is_top: Whether card is top card in column.
+
+		Returns:
+			bool: `True` when selected highlight should be shown.
+		"""
 		if not is_draggable or not self.selected_source:
 			return False
 		if self.selected_source[:2] != (SLOT_TABLEAU, col_idx):

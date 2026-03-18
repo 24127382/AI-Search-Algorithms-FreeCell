@@ -1,3 +1,5 @@
+"""Top control bar for game actions and solver selection."""
+
 from frontend.shared.qt import QHBoxLayout, QLabel, QPushButton, QWidget, Signal, QMenu, QAction
 
 
@@ -5,6 +7,8 @@ SOLVER_ALGORITHMS = ("BFS", "DFS", "UCS", "A*")
 
 
 class ControlPanel(QWidget):
+	"""Action toolbar exposing game controls and solver mode choices."""
+
 	new_game_requested = Signal()
 	restart_requested = Signal()
 	undo_requested = Signal()
@@ -13,6 +17,11 @@ class ControlPanel(QWidget):
 	auto_foundation_requested = Signal()
 
 	def __init__(self, parent=None):
+		"""Create controls, move counter, and style definitions.
+
+		Args:
+			parent: Optional parent widget.
+		"""
 		super().__init__(parent)
 		self.setObjectName("ControlPanel")
 		self._move_count_label = QLabel("Moves: 0")
@@ -67,6 +76,7 @@ class ControlPanel(QWidget):
 			}
 		""")
 	def _build_ui(self):
+		"""Build buttons and nested solver menu, then wire signals."""
 		layout = QHBoxLayout(self)
 		layout.setContentsMargins(10, 10, 10, 10)
 		layout.setSpacing(8)
@@ -117,5 +127,10 @@ class ControlPanel(QWidget):
 		layout.addWidget(self._move_count_label)
 
 	def set_move_count(self, count: int):
+		"""Update move counter label.
+
+		Args:
+			count: Current number of performed moves.
+		"""
 		self._move_count_label.setText(f"Moves: {count}")
 

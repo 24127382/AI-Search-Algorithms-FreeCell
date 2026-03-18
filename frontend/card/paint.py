@@ -1,8 +1,18 @@
+"""Painting helpers for card faces and interactive overlays."""
+
 from frontend.card.assets import card_asset_path
 from frontend.shared.qt import QColor, QPainterPath, QPen, QPixmap, Qt
 
 
 def paint_card_face(painter, card, width: int, height: int):
+	"""Draw card image, or fallback text card when asset is unavailable.
+
+	Args:
+		painter: Active Qt painter.
+		card: Card model instance.
+		width: Target card width.
+		height: Target card height.
+	"""
 	pixmap = QPixmap(card_asset_path(card))
 	if not pixmap.isNull():
 		pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
@@ -16,6 +26,16 @@ def paint_card_face(painter, card, width: int, height: int):
 
 
 def paint_card_overlay(painter, width: int, height: int, selected: bool, hovered: bool, drag_enabled: bool):
+	"""Draw border/shadow/selection overlays above card face.
+
+	Args:
+		painter: Active Qt painter.
+		width: Card width.
+		height: Card height.
+		selected: Whether card is selected.
+		hovered: Whether pointer is hovering card.
+		drag_enabled: Whether card is draggable.
+	"""
 	painter.setPen(QPen(QColor(255, 255, 255, 55), 1))
 	painter.setBrush(Qt.BrushStyle.NoBrush)
 	painter.drawRoundedRect(0, 0, width - 1, height - 1, 8, 8)

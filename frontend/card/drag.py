@@ -1,8 +1,19 @@
+"""Drag/drop payload and pixmap helpers for card interactions."""
+
 from frontend.card.assets import SUIT_SYMBOL, card_asset_path
 from frontend.shared.qt import QColor, QMimeData, QPainter, QPixmap, Qt
 
 
 def parse_drop_position(payload: str, target_position: tuple) -> tuple[tuple | None, tuple | None]:
+	"""Parse drop payload and convert to engine-compatible positions.
+
+	Args:
+		payload: Drag payload text.
+		target_position: Widget target position tuple.
+
+	Returns:
+		tuple[tuple | None, tuple | None]: Parsed `(from_pos, to_pos)`.
+	"""
 	parts = payload.split(":")
 	if len(parts) < 2:
 		return None, None
@@ -21,12 +32,30 @@ def parse_drop_position(payload: str, target_position: tuple) -> tuple[tuple | N
 
 
 def build_drag_mime(payload: str) -> QMimeData:
+	"""Create Qt mime data object carrying drag payload text.
+
+	Args:
+		payload: Drag payload text.
+
+	Returns:
+		QMimeData: Mime object used by drag operation.
+	"""
 	mime = QMimeData()
 	mime.setText(payload)
 	return mime
 
 
 def build_preview_pixmap(card, width: int, height: int) -> QPixmap:
+	"""Create single-card drag preview pixmap.
+
+	Args:
+		card: Card model instance.
+		width: Preview width in pixels.
+		height: Preview height in pixels.
+
+	Returns:
+		QPixmap: Rendered preview image.
+	"""
 	pixmap = QPixmap(width, height)
 	pixmap.fill(Qt.GlobalColor.transparent)
 
@@ -53,6 +82,16 @@ def build_preview_pixmap(card, width: int, height: int) -> QPixmap:
 
 
 def build_stacked_drag_pixmap(card_widget, drag_sequence: list, offset: int = 30) -> QPixmap:
+	"""Build stacked drag preview for multi-card sequence drags.
+
+	Args:
+		card_widget: Source card widget.
+		drag_sequence: Cards included in drag.
+		offset: Vertical overlap offset in pixels.
+
+	Returns:
+		QPixmap: Stacked drag preview image.
+	"""
 	cards = drag_sequence or [card_widget.card]
 	card_height = card_widget.height()
 	total_height = card_height + (len(cards) - 1) * offset
@@ -74,6 +113,14 @@ def build_stacked_drag_pixmap(card_widget, drag_sequence: list, offset: int = 30
 
 
 def collect_dragged_widgets(card_widget) -> list:
+	"""Collect widgets that should hide during drag operation.
+
+	Args:
+		card_widget: Drag origin card widget.
+
+	Returns:
+		list: Widgets to hide while dragging.
+	"""
 	widgets = []
 	parent = card_widget.parent()
 	if parent is not None:

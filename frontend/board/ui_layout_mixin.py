@@ -1,9 +1,14 @@
+"""Board layout construction mixin for top slots and tableau columns."""
+
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
 from frontend.board.slot_widgets import SlotButton, TableauColumnWidget
 from frontend.shared.qt import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, Qt
 
 class BoardUiLayoutMixin:
+	"""Build and wire static board layout widgets."""
+
 	def _build_ui(self):
+		"""Create top row, tableau section, and base styling."""
 		self._apply_board_styles()
 		root_layout = QVBoxLayout(self)
 		root_layout.setContentsMargins(14, 12, 14, 12)
@@ -15,6 +20,7 @@ class BoardUiLayoutMixin:
 		root_layout.addWidget(self._build_tableau_container(), 1)
 
 	def _apply_board_styles(self):
+		"""Apply shared stylesheet for board labels and slot buttons."""
 		self.setStyleSheet("""
 			QLabel {
 				color: #f3f8f4;
@@ -33,6 +39,15 @@ class BoardUiLayoutMixin:
 		""")
 
 	def _create_section_title(self, text: str, align_center: bool) -> QLabel:
+		"""Create standardized section header label.
+
+		Args:
+			text: Label text.
+			align_center: Whether to center-align text.
+
+		Returns:
+			QLabel: Configured label widget.
+		"""
 		label = QLabel(text)
 		label.setStyleSheet("font-weight: 700; font-size: 14pt; letter-spacing: 0.5px;")
 		if align_center:
@@ -40,6 +55,11 @@ class BoardUiLayoutMixin:
 		return label
 
 	def _build_top_row(self) -> QHBoxLayout:
+		"""Build row containing freecell and foundation slot buttons.
+
+		Returns:
+			QHBoxLayout: Top-row layout.
+		"""
 		top_row = QHBoxLayout()
 		top_row.setSpacing(14)
 		top_row.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
@@ -70,6 +90,11 @@ class BoardUiLayoutMixin:
 		return top_row
 
 	def _build_tableau_container(self):
+		"""Build container that hosts all tableau column widgets.
+
+		Returns:
+			QWidget: Tableau container widget.
+		"""
 		tableau_container = QWidget()
 		tableau_row = QHBoxLayout(tableau_container)
 		tableau_row.setContentsMargins(0, 0, 0, 0)
@@ -89,6 +114,14 @@ class BoardUiLayoutMixin:
 		return tableau_container
 
 	def _create_tableau_column_widget(self, col_idx: int) -> TableauColumnWidget:
+		"""Create one tableau column drop area and top target button.
+
+		Args:
+			col_idx: Tableau column index.
+
+		Returns:
+			TableauColumnWidget: Configured column widget.
+		"""
 		col_widget = TableauColumnWidget(col_idx)
 		col_widget.drop_received.connect(self._on_drop_received)
 		col_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
@@ -108,6 +141,11 @@ class BoardUiLayoutMixin:
 		return col_widget
 
 	def _on_card_clicked_dispatcher(self, pos: tuple):
+		"""Dispatch card click signals to matching interaction handlers.
+
+		Args:
+			pos: Clicked card/slot position tuple.
+		"""
 		if pos[0] == SLOT_TABLEAU:
 			self._on_tableau_card_clicked(pos)
 		elif pos[0] == SLOT_FREECELL:

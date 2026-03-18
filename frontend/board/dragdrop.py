@@ -1,4 +1,14 @@
+"""Helpers for encoding and parsing lightweight board drag payloads."""
+
 def parse_drag_payload(payload: str) -> tuple | None:
+	"""Parse drag payload into position tuple.
+
+	Args:
+		payload: Drag payload text.
+
+	Returns:
+		tuple | None: `(slot_type, index[, card_index])` or `None` when invalid.
+	"""
 	parts = payload.split(":")
 	if len(parts) < 2:
 		return None

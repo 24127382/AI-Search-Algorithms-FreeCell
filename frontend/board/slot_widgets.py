@@ -1,13 +1,24 @@
+"""Custom slot widgets for board drops and click/drag interactions."""
+
 from frontend.board.constants import SLOT_FREECELL, SLOT_TABLEAU
 from frontend.board.dragdrop import parse_drag_payload
 from frontend.shared.qt import QDrag, QGraphicsOpacityEffect, QMimeData, QPixmap, QPushButton, Qt, Signal, QWidget
 
 
 class SlotButton(QPushButton):
+	"""Interactive button that acts as a board slot and drag/drop endpoint."""
+
 	card_clicked = Signal(tuple)
 	drop_received = Signal(tuple, tuple)
 
 	def __init__(self, slot_type: str, slot_index: int, parent=None):
+		"""Create slot button bound to one logical board position.
+
+		Args:
+			slot_type: Slot type label.
+			slot_index: Slot index inside type group.
+			parent: Optional parent widget.
+		"""
 		super().__init__(parent)
 		self.slot_type = slot_type.lower()
 		self.slot_index = slot_index
@@ -18,16 +29,24 @@ class SlotButton(QPushButton):
 		self.setAcceptDrops(True)
 
 	def set_drag_payload(self, payload: str, enabled: bool):
+		"""Configure drag payload text and drag enable flag.
+
+		Args:
+			payload: Drag payload string.
+			enabled: Whether dragging is enabled.
+		"""
 		self._drag_payload = payload
 		self._drag_enabled = enabled
 
 	def mousePressEvent(self, event):
+		"""Store starting mouse position for drag-threshold detection."""
 		if event.button() == Qt.MouseButton.LeftButton:
 			self._mouse_press_pos = event.pos()
 			self._drag_started = False
 		super().mousePressEvent(event)
 
 	def mouseMoveEvent(self, event):
+		"""Start a drag operation when left-button movement exceeds threshold."""
 		if not self._drag_enabled:
 			super().mouseMoveEvent(event)
 			return
@@ -78,6 +97,7 @@ class SlotButton(QPushButton):
 		super().mouseMoveEvent(event)
 
 	def mouseReleaseEvent(self, event):
+		"""Emit card-click when release occurs without initiating a drag."""
 		if event.button() == Qt.MouseButton.LeftButton and not self._drag_started:
 			source = (self.slot_type, self.slot_index)
 			if self.slot_type in (SLOT_TABLEAU, SLOT_FREECELL):
@@ -85,12 +105,14 @@ class SlotButton(QPushButton):
 		super().mouseReleaseEvent(event)
 
 	def dragEnterEvent(self, event):
+		"""Accept drag events that carry expected text payload format."""
 		if event.mimeData().hasText() and ":" in event.mimeData().text():
 			event.acceptProposedAction()
 			return
 		event.ignore()
 
 	def dropEvent(self, event):
+		"""Parse source payload and emit a normalized drop event."""
 		from_pos = parse_drag_payload(event.mimeData().text())
 		if from_pos is None:
 			event.ignore()
@@ -102,21 +124,31 @@ class SlotButton(QPushButton):
 
 
 class TableauColumnWidget(QWidget):
+	"""Container widget representing one tableau column drop area."""
+
 	drop_received = Signal(tuple, tuple)
 
 	def __init__(self, col_idx: int, parent=None):
+		"""Initialize drop target for specific tableau column index.
+
+		Args:
+			col_idx: Tableau column index.
+			parent: Optional parent widget.
+		"""
 		super().__init__(parent)
 		self.col_idx = col_idx
 		self.setAcceptDrops(True)
 		self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
 	def dragEnterEvent(self, event):
+		"""Accept drag events that carry expected text payload format."""
 		if event.mimeData().hasText() and ":" in event.mimeData().text():
 			event.acceptProposedAction()
 			return
 		event.ignore()
 
 	def dropEvent(self, event):
+		"""Emit drop event mapping source payload into this tableau column."""
 		from_pos = parse_drag_payload(event.mimeData().text())
 		if from_pos is None:
 			event.ignore()

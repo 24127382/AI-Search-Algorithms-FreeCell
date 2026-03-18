@@ -1,3 +1,5 @@
+"""Mouse interaction handlers for selecting and moving cards on the board."""
+
 from backend.engine.engine import get_valid_moves
 from backend.model.card import Card
 from backend.rule.rules import get_movable_sequences
@@ -6,7 +8,14 @@ from frontend.card.assets import SUIT_SYMBOL
 
 
 class BoardMoveInteractionMixin:
+	"""Encapsulates click/double-click interaction rules for board widgets."""
+
 	def _on_slot_source_clicked(self, source: tuple[str, int]):
+		"""Route slot click by slot type.
+
+		Args:
+			source: Clicked source tuple.
+		"""
 		source_type, source_idx = source
 		if source_type == SLOT_TABLEAU:
 			self._on_tableau_target_clicked(source_idx)
@@ -14,6 +23,11 @@ class BoardMoveInteractionMixin:
 			self._on_freecell_clicked(source_idx)
 
 	def _on_tableau_card_clicked(self, pos: tuple):
+		"""Select tableau source or attempt move to clicked column.
+
+		Args:
+			pos: Clicked card position tuple.
+		"""
 		if self.state is None:
 			return
 
@@ -34,6 +48,15 @@ class BoardMoveInteractionMixin:
 		self._try_move((SLOT_TABLEAU, col_idx))
 
 	def _resolve_tableau_selection(self, col_idx: int, pos: tuple) -> tuple[tuple, Card] | None:
+		"""Resolve tableau selection target.
+
+		Args:
+			col_idx: Tableau column index.
+			pos: Clicked position tuple.
+
+		Returns:
+			tuple[tuple, Card] | None: Selected source and card, or `None`.
+		"""
 		col_cards = self.state.tableau[col_idx]
 		top_card = col_cards[-1]
 		source = (SLOT_TABLEAU, col_idx)
@@ -50,9 +73,22 @@ class BoardMoveInteractionMixin:
 		return source, top_card
 
 	def _movable_bases(self, col_cards: tuple) -> set[Card]:
+		"""Return set of card bases that can start movable sequences.
+
+		Args:
+			col_cards: Tableau column cards.
+
+		Returns:
+			set[Card]: Movable sequence base cards.
+		"""
 		return {sequence[0] for sequence in get_movable_sequences(col_cards)}
 
 	def _on_card_double_clicked(self, pos: tuple):
+		"""Attempt auto-move to foundation, then fallback to freecell.
+
+		Args:
+			pos: Double-clicked position tuple.
+		"""
 		if self.state is None:
 			return
 
@@ -72,6 +108,14 @@ class BoardMoveInteractionMixin:
 			self._apply_automatic_move(freecell_move, "Automatically moved to FreeCell.", check_goal=False)
 
 	def _resolve_double_click_source(self, pos: tuple) -> tuple[str, int] | None:
+		"""Map clicked tuple into engine-level source position.
+
+		Args:
+			pos: Clicked card/slot tuple.
+
+		Returns:
+			tuple[str, int] | None: Engine source tuple, or `None`.
+		"""
 		if len(pos) == 3:
 			col_idx = pos[1]
 			card_idx = pos[2]
@@ -85,6 +129,11 @@ class BoardMoveInteractionMixin:
 		return None
 
 	def _on_tableau_target_clicked(self, col_idx: int):
+		"""Select source from tableau or move current selection to this column.
+
+		Args:
+			col_idx: Target tableau column index.
+		"""
 		if self.selected_source is None:
 			card = self.state.tableau[col_idx][-1] if self.state.tableau[col_idx] else None
 			if card is None:
@@ -97,6 +146,11 @@ class BoardMoveInteractionMixin:
 		self._try_move((SLOT_TABLEAU, col_idx))
 
 	def _on_freecell_clicked(self, cell_idx: int):
+		"""Select source from freecell or move current selection to freecell.
+
+		Args:
+			cell_idx: Freecell index.
+		"""
 		if self.selected_source is None:
 			card = self.state.freecells[cell_idx]
 			if card is None:
@@ -109,6 +163,11 @@ class BoardMoveInteractionMixin:
 		self._try_move((SLOT_FREECELL, cell_idx))
 
 	def _on_foundation_clicked(self, foundation_idx: int):
+		"""Attempt move from selected source into foundation pile.
+
+		Args:
+			foundation_idx: Foundation index.
+		"""
 		if self.selected_source is None:
 			self._emit_status("Select a source card before moving to Foundation.")
 			return
