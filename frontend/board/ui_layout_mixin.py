@@ -18,6 +18,7 @@ class BoardUiLayoutMixin:
 		root_layout.addLayout(self._build_top_row())
 		root_layout.addWidget(self._create_section_title("Tableau", align_center=True))
 		root_layout.addWidget(self._build_tableau_container(), 1)
+		root_layout.addLayout(self._build_bottom_info_row())
 
 	def _apply_board_styles(self):
 		"""Apply shared stylesheet for board labels and slot buttons."""
@@ -53,6 +54,29 @@ class BoardUiLayoutMixin:
 		if align_center:
 			label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 		return label
+
+	def _build_bottom_info_row(self) -> QHBoxLayout:
+		"""Build bottom info row with deal number at left corner.
+
+		Returns:
+			QHBoxLayout: Bottom info layout.
+		"""
+		bottom_row = QHBoxLayout()
+		bottom_row.setContentsMargins(0, 2, 0, 0)
+		bottom_row.setSpacing(8)
+
+		self._deal_number_label = QLabel("Deal #-")
+		self._deal_number_label.setObjectName("DealNumberLabel")
+		self._deal_number_label.setStyleSheet(
+			"font-size: 11pt; font-weight: 700; color: #eef8f1; "
+			"background-color: rgba(255, 255, 255, 0.08); "
+			"border: 1px solid rgba(255, 255, 255, 0.2); "
+			"border-radius: 7px; padding: 4px 8px;"
+		)
+		self._deal_number_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+		bottom_row.addWidget(self._deal_number_label, alignment=Qt.AlignmentFlag.AlignLeft)
+		bottom_row.addStretch(1)
+		return bottom_row
 
 	def _build_top_row(self) -> QHBoxLayout:
 		"""Build row containing freecell and foundation slot buttons.

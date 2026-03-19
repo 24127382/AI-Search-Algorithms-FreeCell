@@ -2,9 +2,8 @@
 
 from copy import deepcopy
 
-from backend.engine.shuffle import deal, deal_by_game_number
+from backend.engine.shuffle import deal_by_game_number, random_deal_number
 from backend.model.state import State
-from frontend.board.constants import DIFFICULTY_LEVELS
 from frontend.board.move_interaction_mixin import BoardMoveInteractionMixin
 from frontend.board.move_core_mixin import BoardMoveCoreMixin
 from frontend.board.solver_mixin import BoardSolverMixin
@@ -25,12 +24,13 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	status_changed = Signal(str)
 	move_count_changed = Signal(int)
 	game_won = Signal()
+	deal_number_changed = Signal(int)
 
-	def __init__(self, difficulty: str = "medium", parent=None):
+	def __init__(self, deal_number: int | None = None, parent=None):
 		"""Initialize board internals, build UI, and start first deal.
 
 		Args:
-			difficulty: Initial difficulty label.
+			deal_number: Optional fixed Microsoft deal number.
 			parent: Optional parent widget.
 		"""
 		super().__init__(parent)
@@ -39,9 +39,8 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.history: list[State] = []
 		self.selected_source: tuple | None = None
 		self.move_count = 0
-		self.difficulty = "medium"
+		self.requested_deal_number: int | None = deal_number
 		self.current_deal_number: int | None = None
-		self.set_difficulty(difficulty)
 		self.solver_thread = None
 		self.is_solving = False
 		self._solve_started_at = 0.0
@@ -51,6 +50,7 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self._tableau_buttons = []
 		self._tableau_layouts = []
 		self._card_registry = {}
+		self._deal_number_label = None
 
 		self._build_ui()
 		self.new_game()
@@ -61,21 +61,21 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		Returns:
 			State: Freshly initialized game state.
 		"""
-		# deal_number, tableau = deal(self.difficulty)
-		tableau = deal_by_game_number(1)
-		self.current_deal_number = 1
+		deal_number = self.requested_deal_number if self.requested_deal_number is not None else random_deal_number()
+		tableau = deal_by_game_number(deal_number)
+		self.current_deal_number = deal_number
+		self.deal_number_changed.emit(deal_number)
+		self._update_deal_number_label()
 		return State.from_lists(tableau=tableau, freecells=[None] * 4, foundations=[[] for _ in range(4)])
 
-	def set_difficulty(self, difficulty: str):
-		"""Normalize and persist difficulty value.
-
-		Args:
-			difficulty: Candidate difficulty label.
-		"""
-		normalized = (difficulty or "medium").strip().lower()
-		if normalized not in DIFFICULTY_LEVELS:
-			normalized = "medium"
-		self.difficulty = normalized
+	def _update_deal_number_label(self):
+		"""Refresh on-board deal number text shown at bottom-left."""
+		if self._deal_number_label is None:
+			return
+		if self.current_deal_number is None:
+			self._deal_number_label.setText("Deal #-")
+			return
+		self._deal_number_label.setText(f"Deal #{self.current_deal_number}")
 
 	def new_game(self):
 		"""Reset game/session counters and render a new deal."""
@@ -85,4 +85,4 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.move_count = 0
 		self.selected_source = None
 		self._render()
-		self._emit_status(f"New game started ({self.difficulty.title()}) - Deal #{self.current_deal_number}.")
+		self._emit_status(f"New game started - Deal #{self.current_deal_number}.")
