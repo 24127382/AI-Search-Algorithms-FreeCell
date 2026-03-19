@@ -8,13 +8,6 @@ _MS_RAND_MULTIPLIER = 214013
 _MS_RAND_INCREMENT = 2531011
 _MS_RAND_MASK = 0x7FFFFFFF
 _MS_SUIT_MAP = {"C": "clubs", "D": "diamonds", "H": "hearts", "S": "spades"}
-_DIFFICULTY_LEVELS = ("easy", "medium", "hard", "expert")
-_SOLVED_GAME_NUMBERS_BY_DIFFICULTY: dict[str, tuple[int, ...]] = {
-	"easy": (1, 2, 3, 4, 6, 7, 8, 10, 12, 14, 17, 20, 24, 30, 38, 45),
-	"medium": (52, 63, 77, 81, 96, 104, 118, 126, 139, 157, 173, 188, 204, 229, 251, 279),
-	"hard": (301, 337, 389, 417, 468, 512, 579, 624, 711, 758, 824, 907, 961, 1033, 1177, 1291),
-	"expert": (1369, 1458, 1597, 1724, 1888, 2019, 2197, 2333, 2548, 2791, 3017, 3371, 3908, 4217, 4899, 5631),
-}
 
 
 def _microsoft_rand_stream(seed: int) -> tuple[int, ...]:
@@ -42,12 +35,7 @@ def microsoft_shuffled_deck(deal_number: int) -> tuple[Card, ...]:
 	Returns:
 		tuple[Card, ...]: Shuffled 52-card deck.
 
-	Raises:
-		ValueError: If `deal_number` is negative.
 	"""
-	if deal_number < 0:
-		raise ValueError("deal_number must be non-negative")
-
 	deck = [
 		Card(
 			suit=_MS_SUIT_MAP["CDHS"[value % 4]],
@@ -80,38 +68,24 @@ def _to_tableau(cards: Sequence[Card]) -> tuple[tuple[Card, ...], ...]:
 		tableau[idx % 8].append(card)
 	return tuple(tuple(column) for column in tableau)
 
-def _normalize_difficulty(difficulty: str) -> str:
-	"""Normalize and validate difficulty string.
-
-	Args:
-		difficulty: Input difficulty label.
-
-	Returns:
-		str: Canonical lowercase difficulty.
-
-	Raises:
-		ValueError: If difficulty is not one of supported levels.
-	"""
-	normalized = (difficulty or "medium").strip().lower()
-	if normalized not in _DIFFICULTY_LEVELS:
-		valid = ", ".join(_DIFFICULTY_LEVELS)
-		raise ValueError(f"Invalid difficulty '{difficulty}'. Expected one of: {valid}")
-	return normalized
-
-
-def deal(difficulty: str = "medium") -> tuple[int, tuple[tuple[Card, ...], ...]]:
-	"""Pick a curated solved deal and return its tableau.
-
-	Args:
-		difficulty: Difficulty bucket to sample from.
+def deal() -> tuple[int, tuple[tuple[Card, ...], ...]]:
+	"""Pick a random deal number and return its tableau.
 
 	Returns:
 		tuple[int, tuple[tuple[Card, ...], ...]]: Chosen game number and tableau.
 	"""
-	normalized = _normalize_difficulty(difficulty)
-	game_number = Random().choice(_SOLVED_GAME_NUMBERS_BY_DIFFICULTY[normalized])
+	game_number = random_deal_number()
 	tableau = _to_tableau(microsoft_shuffled_deck(game_number))
 	return game_number, tableau
+
+
+def random_deal_number() -> int:
+	"""Return one random deal number.
+
+	Returns:
+		int: Random 63-bit non-negative integer.
+	"""
+	return Random().getrandbits(63)
 
 
 def deal_random() -> tuple[tuple[Card, ...], ...]:
@@ -133,10 +107,6 @@ def deal_by_game_number(game_number: int) -> tuple[tuple[Card, ...], ...]:
 	Returns:
 		tuple[tuple[Card, ...], ...]: Tableau for this deal.
 
-	Raises:
-		ValueError: If `game_number` is negative.
 	"""
-	if game_number < 0:
-		raise ValueError("game_number must be non-negative")
 	tableau = _to_tableau(microsoft_shuffled_deck(game_number))
 	return tableau
