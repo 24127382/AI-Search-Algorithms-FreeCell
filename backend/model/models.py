@@ -66,9 +66,25 @@ class State:
                 self.foundations == other.foundations)
        
     def __hash__(self):
-        """Hash for visited set in search algorithms."""
-        return hash((self.tableau, self.freecells, self.foundations))
+        """Hash for visited set in search algorithms using Zobrist hashing."""
+        from backend.solver.utils import ZOBRIST_TABLE
+        
+        h = 0
+        # Hashing for tableau (positions 0-7)
+        for col_idx, col in enumerate(self.tableau):
+            for card in col:
+                h ^= ZOBRIST_TABLE[card][col_idx]
+        # Hashing for freecells (positions 8-11)
+        for cell_idx, cell in enumerate(self.freecells):
+            if cell is not None:
+                h ^= ZOBRIST_TABLE[cell][8 + cell_idx]
+        # Hashing for foundations (positions 12-15)
+        for foundation_idx, foundation in enumerate(self.foundations):
+            if foundation:  # If foundation is not empty
+                top_card = foundation[-1]
+                h ^= ZOBRIST_TABLE[top_card][12 + foundation_idx]
 
+        return h
 @dataclass(frozen=True)
 class Move:
     '''Represents a move in the game.'''

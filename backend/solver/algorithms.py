@@ -10,6 +10,11 @@ Algorithms included:
 - A*
 '''
 
+from collections import deque
+
+from backend.engine.engine import apply_move, get_valid_moves, is_goal
+
+
 class SearchAlgorithm:
     def __init__(self, game_state):
         self.game_state = game_state
@@ -27,7 +32,21 @@ class SearchAlgorithm:
             raise ValueError("Unknown algorithm: {}".format(algorithm))
         
     def _bfs(self):
-        pass
+        queue = deque([(self.game_state, [])])
+        visited = {self.game_state}
+        
+        while queue:
+            state, path = queue.popleft()
+            if is_goal(state):
+                return path
+            
+            for move in get_valid_moves(state):
+                new_state = apply_move(state, move)
+                if new_state not in visited:
+                    visited.add(new_state)
+                    queue.append((new_state, path + [move]))
+
+        return None  # No solution found
     
     def _dfs(self):
         pass
