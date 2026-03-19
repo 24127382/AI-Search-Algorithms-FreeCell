@@ -3,6 +3,8 @@
 from heapq import nsmallest
 from typing import Dict, Iterable, List, Tuple
 
+from backend.rule.rules import can_move_to_tableau
+
 
 class BloomFilter:
 	"""Simple integer bloom filter used for optional state pre-pruning."""
@@ -80,24 +82,125 @@ def state_id(state):
 	return hash(state)
 
 
-def ucs_move_cost(move):
+def _moved_sequence_len(move) -> int:
+	"""Return moved sequence length for a move."""
+	return len(move.sequence) if move.sequence else 1
+
+
+def is_good_tableau_build(move, prev_state=None) -> bool:
+	"""Check whether a tableau move strengthens tableau structure.
+
+	A move is considered structurally good when it extends an existing column
+	(top stack non-empty) with a legal alternating-color descending link.
+	"""
+	if prev_state is None:
+		return False
+	if move.to_pos[0] != "tableau":
+		return False
+
+	dest_column = prev_state.tableau[move.to_pos[1]]
+	if not dest_column:
+		return False
+
+	dest_top = dest_column[-1]
+	return can_move_to_tableau(move.card, (dest_top,))
+
+
+def is_breaking_stack(move, prev_state=None) -> bool:
+	"""Check whether move breaks an already well-built source stack."""
+	if prev_state is None:
+		return False
+	if move.from_pos[0] != "tableau":
+		return False
+
+	source_column = prev_state.tableau[move.from_pos[1]]
+	moved_len = _moved_sequence_len(move)
+	remaining_len = len(source_column) - moved_len
+	if remaining_len <= 0:
+		return False
+
+	moved_base = source_column[remaining_len]
+	below_card = source_column[remaining_len - 1]
+	return can_move_to_tableau(moved_base, (below_card,))
+
+
+def is_creating_empty_column(move, prev_state=None) -> bool:
+	"""Check whether move frees an entire tableau column."""
+	if prev_state is None:
+		return False
+	if move.from_pos[0] != "tableau":
+		return False
+
+	source_column = prev_state.tableau[move.from_pos[1]]
+	return len(source_column) == _moved_sequence_len(move)
+
+
+def is_filling_empty_column(move, prev_state=None) -> bool:
+	"""Check whether move goes into an empty tableau column."""
+	if prev_state is None:
+		return False
+	if move.to_pos[0] != "tableau":
+		return False
+
+	return len(prev_state.tableau[move.to_pos[1]]) == 0
+
+
+def is_meaningless_empty_column_fill(move, prev_state=None) -> bool:
+	"""Detect expensive empty-column fill patterns with low strategic value."""
+	if not is_filling_empty_column(move, prev_state):
+		return False
+
+	sequence_len = _moved_sequence_len(move)
+	if move.from_pos[0] == "tableau":
+		source_column = prev_state.tableau[move.from_pos[1]]
+		return sequence_len == 1 and len(source_column) > 1
+
+	return False
+
+
+def ucs_move_cost(move, prev_state=None, next_state=None):
 	"""Compute UCS edge cost for one move.
 
 	Args:
 		move: Move object.
+		prev_state: Source state before applying the move.
+		next_state: Destination state after applying the move.
 
 	Returns:
 		int: Edge cost used by UCS.
 	"""
 	if move.to_pos[0] == "foundation":
 		return 1
-	if move.from_pos[0] == "freecell" and move.to_pos[0] == "tableau":
-		return 2
-	if move.from_pos[0] == "tableau" and move.to_pos[0] == "tableau":
-		return 3
+
+	cost = 10
+
+	if is_good_tableau_build(move, prev_state):
+		cost -= 3
+
+	if is_creating_empty_column(move, prev_state):
+		cost -= 4
+
+	if is_breaking_stack(move, prev_state):
+		cost += 6
+
+	if is_meaningless_empty_column_fill(move, prev_state):
+		cost += 6
+
 	if move.to_pos[0] == "freecell":
-		return 4
-	return 3
+		cost += 4
+
+	if move.from_pos[0] == "freecell" and move.to_pos[0] == "tableau":
+		cost -= 2
+
+	if next_state is not None:
+		prev_foundation_total = sum(len(stack) for stack in prev_state.foundations) if prev_state is not None else 0
+		next_foundation_total = sum(len(stack) for stack in next_state.foundations)
+		if next_foundation_total > prev_foundation_total:
+			cost = min(cost, 1)
+
+	if cost < 1:
+		return 1
+	return int(cost)
 
 
 def move_signature(move) -> Tuple[str, int, str, int, str, int, Tuple[int, ...]]:

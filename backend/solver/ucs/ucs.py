@@ -301,7 +301,7 @@ class UCSAlgorithm:
 
                 move_cap = mode_config["MAX_MOVES_PER_STATE"]
                 if move_cap > 0 and len(candidate_moves) > move_cap:
-                    candidate_moves.sort(key=ucs_move_cost)
+                    candidate_moves.sort(key=lambda move: ucs_move_cost(move, prev_state=current_state))
                     candidate_moves = candidate_moves[:move_cap]
 
                 partial_width = mode_config["PARTIAL_EXPANSION_WIDTH"]
@@ -313,7 +313,9 @@ class UCSAlgorithm:
                     next_state, forced_moves = apply_move_with_forced(current_state, move)
                     edge_moves = (move, *forced_moves)
                     next_state_id = state_id(next_state)
-                    edge_cost = sum(ucs_move_cost(applied_move) for applied_move in edge_moves)
+                    edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=next_state)
+                    if forced_moves:
+                        edge_cost += sum(ucs_move_cost(applied_move) for applied_move in forced_moves)
                     new_cost = cost + edge_cost
                     stats["generated_nodes"] += 1
 

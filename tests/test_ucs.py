@@ -2,8 +2,14 @@ import pytest
 
 from backend.engine.engine import apply_move
 from backend.model.card import Card, VALID_RANK, VALID_SUITS
+from backend.model.move import Move, MoveType
 from backend.model.state import State
 from backend.solver.ucs import UCSAlgorithm
+from backend.solver.ucs.ucs_utils import (
+	is_breaking_stack,
+	is_creating_empty_column,
+	ucs_move_cost,
+)
 
 
 def _build_near_goal_state() -> State:
@@ -64,3 +70,85 @@ def test_ucs_rejects_invalid_mode():
 
 	with pytest.raises(ValueError, match="Unsupported UCS mode"):
 		UCSAlgorithm(state, mode="invalid")
+
+
+def test_ucs_cost_foundation_is_cheapest_progress_move():
+	state = State.from_lists(
+		tableau=[[Card("hearts", "A")]] + [[] for _ in range(7)],
+		freecells=[None, None, None, None],
+		foundations=[[], [], [], []],
+	)
+
+	move_to_foundation = Move(
+		MoveType.TABLEAU_TO_FOUNDATION,
+		Card("hearts", "A"),
+		("tableau", 0),
+		("foundation", 0),
+		sequence=(Card("hearts", "A"),),
+	)
+	move_to_freecell = Move(
+		MoveType.TABLEAU_TO_FREECELL,
+		Card("hearts", "A"),
+		("tableau", 0),
+		("freecell", 0),
+		sequence=(Card("hearts", "A"),),
+	)
+
+	assert ucs_move_cost(move_to_foundation, prev_state=state) < ucs_move_cost(move_to_freecell, prev_state=state)
+
+
+def test_ucs_cost_penalizes_breaking_stack_and_rewards_empty_creation():
+	breaking_state = State.from_lists(
+		tableau=[[Card("spades", "9"), Card("hearts", "8")], []] + [[] for _ in range(6)],
+		freecells=[None, None, None, None],
+		foundations=[[], [], [], []],
+	)
+	breaking_move = Move(
+		MoveType.TABLEAU_TO_FREECELL,
+		Card("hearts", "8"),
+		("tableau", 0),
+		("freecell", 0),
+		sequence=(Card("hearts", "8"),),
+	)
+
+	empty_creation_state = State.from_lists(
+		tableau=[[Card("spades", "K")], [], []] + [[] for _ in range(5)],
+		freecells=[None, None, None, None],
+		foundations=[[], [], [], []],
+	)
+	empty_creation_move = Move(
+		MoveType.TABLEAU_TO_TABLEAU,
+		Card("spades", "K"),
+		("tableau", 0),
+		("tableau", 1),
+		sequence=(Card("spades", "K"),),
+	)
+
+	assert is_breaking_stack(breaking_move, breaking_state)
+	assert is_creating_empty_column(empty_creation_move, empty_creation_state)
+	assert ucs_move_cost(breaking_move, prev_state=breaking_state) > ucs_move_cost(empty_creation_move, prev_state=empty_creation_state)
+
+
+def test_ucs_cost_penalizes_meaningless_empty_column_fill():
+	state = State.from_lists(
+		tableau=[[Card("spades", "9"), Card("hearts", "7")], [], [Card("spades", "8")]] + [[] for _ in range(5)],
+		freecells=[None, None, None, None],
+		foundations=[[], [], [], []],
+	)
+
+	meaningless_fill_move = Move(
+		MoveType.TABLEAU_TO_TABLEAU,
+		Card("hearts", "7"),
+		("tableau", 0),
+		("tableau", 1),
+		sequence=(Card("hearts", "7"),),
+	)
+	good_build_move = Move(
+		MoveType.TABLEAU_TO_TABLEAU,
+		Card("hearts", "7"),
+		("tableau", 0),
+		("tableau", 2),
+		sequence=(Card("hearts", "7"),),
+	)
+
+	assert ucs_move_cost(meaningless_fill_move, prev_state=state) > ucs_move_cost(good_build_move, prev_state=state)
