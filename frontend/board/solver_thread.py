@@ -23,11 +23,31 @@ class SolverThread(QThread):
 		self.algo = algo
 		self.ucs_mode = ucs_mode
 
+	def stop(self, timeout_ms: int = 250):
+		"""Stop the running worker thread.
+
+		Args:
+			timeout_ms: Time to wait for graceful stop before forced terminate.
+		"""
+		self.requestInterruption()
+		if not self.isRunning():
+			return
+
+		if not self.wait(timeout_ms):
+			self.terminate()
+			self.wait(500)
+
 	def run(self):
 		"""Execute solver and emit either path or formatted error message."""
 		try:
+			if self.isInterruptionRequested():
+				return
 			solver = SearchAlgorithm(self.state, mode=self.ucs_mode)
 			path = solver.search(self.algo)
+			if self.isInterruptionRequested():
+				return
 			self.result_ready.emit(path)
 		except Exception as exc:
+			if self.isInterruptionRequested():
+				return
 			self.error_occurred.emit(str(exc))

@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
 		self.selected_deal_number: int | None = deal_number
 		self.current_deal_number: int | None = None
 		self.setWindowTitle(f"FreeCell - {QT_API}")
-		self.resize(1000, 700)
+		self.resize(1000, 750)
 
 		self.board = BoardWidget(deal_number=deal_number)
 		self.controls = ControlPanel()
@@ -152,10 +152,12 @@ class MainWindow(QMainWindow):
 		self.controls.undo_requested.connect(self.board.undo)
 		self.controls.solve_requested.connect(self.board.solve_with_algo)
 		self.controls.auto_foundation_requested.connect(self.board.auto_to_foundation)
+		self.controls.stop_solver_requested.connect(self.board.stop_solver)
 
 		self.board.status_changed.connect(self.statusBar().showMessage)
 		self.board.move_count_changed.connect(self.controls.set_move_count)
 		self.board.deal_number_changed.connect(self._on_deal_number_changed)
+		self.board.solver_running_changed.connect(self.controls.set_solver_running)
 		self.board.game_won.connect(self._on_game_won)
 
 	def _on_deal_number_changed(self, deal_number: int):

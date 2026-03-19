@@ -12,6 +12,43 @@ from frontend.shared.qt import QTimer
 class BoardSolverMixin:
 	"""Provides undo/restart and background-solver integration behaviors."""
 
+	def _stop_solver_execution(self) -> bool:
+		"""Stop active solver worker and replay timer, if any.
+
+		Returns:
+			bool: True if any running solver activity was stopped.
+		"""
+		stopped_any = False
+
+		if hasattr(self, "solve_timer") and self.solve_timer:
+			self.solve_timer.stop()
+			self.solve_timer = None
+			stopped_any = True
+
+		if hasattr(self, "solve_path"):
+			self.solve_path = []
+
+		had_running_solver = self.solver_thread is not None or self.is_solving
+
+		if self.solver_thread is not None:
+			self._active_solver_run_id += 1
+			self.solver_thread.stop()
+			self.solver_thread = None
+			self.is_solving = False
+			stopped_any = True
+
+		if had_running_solver:
+			self.solver_running_changed.emit(False)
+
+		return stopped_any
+
+	def stop_solver(self):
+		"""Stop the currently running solver thread, if any."""
+		if self._stop_solver_execution():
+			self._emit_status("Solver stopped.")
+			return
+		self._emit_status("Solver is not running.")
+
 	@staticmethod
 	def _solver_label(algo: str, ucs_mode: str) -> str:
 		"""Build user-friendly solver label.
@@ -57,44 +94,55 @@ class BoardSolverMixin:
 		if self.is_solving:
 			self._emit_status("A solver is already running. Please wait.")
 			return
-		if hasattr(self, "solve_timer") and self.solve_timer:
-			self.solve_timer.stop()
-			self.solve_path = []
+		self._stop_solver_execution()
 
 		self.is_solving = True
+		self.solver_running_changed.emit(True)
 		self._solve_started_at = time.perf_counter()
 		solver_label = self._solver_label(algo, ucs_mode)
 		self._emit_status(f"Solving with {solver_label}...")
+		run_id = self._active_solver_run_id + 1
+		self._active_solver_run_id = run_id
 
 		self.solver_thread = SolverThread(self.state, algo, ucs_mode=ucs_mode)
-		self.solver_thread.result_ready.connect(lambda path, label=solver_label: self._on_solver_finished(label, path))
-		self.solver_thread.error_occurred.connect(lambda error, label=solver_label: self._on_solver_error(label, error))
-		self.solver_thread.finished.connect(self._on_solver_thread_finished)
+		self.solver_thread.result_ready.connect(lambda path, label=solver_label, current_run_id=run_id: self._on_solver_finished(label, path, current_run_id))
+		self.solver_thread.error_occurred.connect(lambda error, label=solver_label, current_run_id=run_id: self._on_solver_error(label, error, current_run_id))
+		self.solver_thread.finished.connect(lambda current_run_id=run_id: self._on_solver_thread_finished(current_run_id))
 		self.solver_thread.start()
 
-	def _on_solver_error(self, algo: str, error: str):
+	def _on_solver_error(self, algo: str, error: str, run_id: int):
 		"""Handle solver-thread failures and reset solving state.
 
 		Args:
 			algo: Solver label.
 			error: Error message from solver thread.
+			run_id: Solver invocation id used to ignore stale callbacks.
 		"""
+		if run_id != self._active_solver_run_id:
+			return
 		self._emit_status(f"{algo} error: {error}")
 		self.is_solving = False
+		self.solver_running_changed.emit(False)
 		self.solver_thread = None
 
-	def _on_solver_thread_finished(self):
+	def _on_solver_thread_finished(self, run_id: int):
 		"""Clear thread reference after worker exits."""
+		if run_id != self._active_solver_run_id:
+			return
 		self.is_solving = False
+		self.solver_running_changed.emit(False)
 		self.solver_thread = None
 
-	def _on_solver_finished(self, algo, path):
+	def _on_solver_finished(self, algo, path, run_id: int):
 		"""Receive solved path and start timed replay animation.
 
 		Args:
 			algo: Solver label.
 			path: Solved move sequence.
+			run_id: Solver invocation id used to ignore stale callbacks.
 		"""
+		if run_id != self._active_solver_run_id:
+			return
 		elapsed = time.perf_counter() - self._solve_started_at if self._solve_started_at else 0.0
 		if not path:
 			self._emit_status(f"{algo} failed to find a solution after {elapsed:.1f}s.")
@@ -136,18 +184,16 @@ class BoardSolverMixin:
 		if not getattr(self, "initial_state", None):
 			self._emit_status("Cannot restart: initial state not available.")
 			return
-		if self.is_solving:
-			self._emit_status("Cannot restart while solver is running.")
-			return
-		if hasattr(self, "solve_timer") and self.solve_timer:
-			self.solve_timer.stop()
-			self.solve_path = []
+		solver_stopped = self._stop_solver_execution()
 
 		self.state = deepcopy(self.initial_state)
 		self.history.clear()
 		self.move_count = 0
 		self.selected_source = None
 		self._render()
+		if solver_stopped:
+			self._emit_status("Solver stopped. Game restarted.")
+			return
 		self._emit_status("Game restarted.")
 
 	def auto_to_foundation(self):

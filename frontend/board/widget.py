@@ -25,6 +25,7 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	move_count_changed = Signal(int)
 	game_won = Signal()
 	deal_number_changed = Signal(int)
+	solver_running_changed = Signal(bool)
 
 	def __init__(self, deal_number: int | None = None, parent=None):
 		"""Initialize board internals, build UI, and start first deal.
@@ -44,6 +45,9 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.solver_thread = None
 		self.is_solving = False
 		self._solve_started_at = 0.0
+		self._active_solver_run_id = 0
+		self.solve_timer = None
+		self.solve_path = []
 
 		self._freecell_buttons = []
 		self._foundation_buttons = []
@@ -79,10 +83,14 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 
 	def new_game(self):
 		"""Reset game/session counters and render a new deal."""
+		solver_stopped = self._stop_solver_execution()
 		self.initial_state = self._build_initial_state()
 		self.state = deepcopy(self.initial_state)
 		self.history.clear()
 		self.move_count = 0
 		self.selected_source = None
 		self._render()
+		if solver_stopped:
+			self._emit_status(f"Solver stopped. New game started - Deal #{self.current_deal_number}.")
+			return
 		self._emit_status(f"New game started - Deal #{self.current_deal_number}.")
