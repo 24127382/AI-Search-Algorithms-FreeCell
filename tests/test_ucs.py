@@ -8,6 +8,7 @@ from backend.solver.ucs import UCSAlgorithm
 from backend.solver.ucs.ucs_utils import (
 	is_breaking_stack,
 	is_creating_empty_column,
+	is_meaningless_empty_column_fill,
 	ucs_move_cost,
 )
 
@@ -152,3 +153,50 @@ def test_ucs_cost_penalizes_meaningless_empty_column_fill():
 	)
 
 	assert ucs_move_cost(meaningless_fill_move, prev_state=state) > ucs_move_cost(good_build_move, prev_state=state)
+
+
+def test_ucs_meaningless_empty_fill_detects_short_sequences_not_only_singletons():
+	state = State.from_lists(
+		tableau=[
+			[
+				Card("spades", "K"),
+				Card("hearts", "Q"),
+				Card("clubs", "J"),
+				Card("diamonds", "10"),
+				Card("spades", "9"),
+			],
+			[],
+		] + [[] for _ in range(6)],
+		freecells=[None, None, None, None],
+		foundations=[[], [], [], []],
+	)
+
+	move = Move(
+		MoveType.TABLEAU_TO_TABLEAU,
+		Card("diamonds", "10"),
+		("tableau", 0),
+		("tableau", 1),
+		sequence=(Card("diamonds", "10"), Card("spades", "9")),
+	)
+
+	assert is_meaningless_empty_column_fill(move, state)
+
+
+def test_ucs_cost_caps_breaking_and_meaningless_penalty_stack():
+	state = State.from_lists(
+		tableau=[[Card("spades", "9"), Card("hearts", "8")], []] + [[] for _ in range(6)],
+		freecells=[None, None, None, None],
+		foundations=[[], [], [], []],
+	)
+
+	move = Move(
+		MoveType.TABLEAU_TO_TABLEAU,
+		Card("hearts", "8"),
+		("tableau", 0),
+		("tableau", 1),
+		sequence=(Card("hearts", "8"),),
+	)
+
+	assert is_breaking_stack(move, state)
+	assert is_meaningless_empty_column_fill(move, state)
+	assert ucs_move_cost(move, prev_state=state) == 18

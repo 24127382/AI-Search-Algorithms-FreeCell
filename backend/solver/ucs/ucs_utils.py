@@ -153,7 +153,8 @@ def is_meaningless_empty_column_fill(move, prev_state=None) -> bool:
 	sequence_len = _moved_sequence_len(move)
 	if move.from_pos[0] == "tableau":
 		source_column = prev_state.tableau[move.from_pos[1]]
-		return sequence_len == 1 and len(source_column) > 1
+		remaining_len = len(source_column) - sequence_len
+		return sequence_len <= 3 and remaining_len >= 1
 
 	return False
 
@@ -173,18 +174,28 @@ def ucs_move_cost(move, prev_state=None, next_state=None):
 		return 1
 
 	cost = 10
+	good_tableau_build = is_good_tableau_build(move, prev_state)
+	creates_empty_column = is_creating_empty_column(move, prev_state)
+	breaks_stack = is_breaking_stack(move, prev_state)
+	meaningless_empty_fill = is_meaningless_empty_column_fill(move, prev_state)
 
-	if is_good_tableau_build(move, prev_state):
+	if good_tableau_build:
 		cost -= 3
 
-	if is_creating_empty_column(move, prev_state):
+	if creates_empty_column:
 		cost -= 4
 
-	if is_breaking_stack(move, prev_state):
+	if breaks_stack:
 		cost += 6
 
-	if is_meaningless_empty_column_fill(move, prev_state):
+	if meaningless_empty_fill:
 		cost += 6
+
+	# Intentional trade-off: a move may improve destination structure while
+	# still being discouraged when it breaks a well-ordered source stack.
+	# Cap the compounded restructure penalty to avoid extreme spikes.
+	if breaks_stack and meaningless_empty_fill:
+		cost = min(cost, 18)
 
 	if move.to_pos[0] == "freecell":
 		cost += 4

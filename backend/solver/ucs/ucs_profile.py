@@ -52,50 +52,50 @@ def _machine_limits() -> dict:
 
 	if ram_gb and ram_gb <= 8:
 		return {
-			"MAX_VISITED": 180000,
-			"MAX_FRONTIER": 250000,
-			"KEEP_FRONTIER": 120000,
-			"COMPACTION_GAP": 70000,
-			"BLOOM_BITS": 6_000_000,
+			"MAX_VISITED": 1_200_000,
+			"MAX_FRONTIER": 800_000,
+			"KEEP_FRONTIER": 500_000,
+			"COMPACTION_GAP": 300_000,
+			"BLOOM_BITS": 24_000_000,
 			"BLOOM_HASH_COUNT": 3,
 		}
 
 	if ram_gb and ram_gb <= 16:
 		return {
-			"MAX_VISITED": 350000,
-			"MAX_FRONTIER": 500000,
-			"KEEP_FRONTIER": 240000,
-			"COMPACTION_GAP": 120000,
-			"BLOOM_BITS": 12_000_000,
+			"MAX_VISITED": 3_500_000,
+			"MAX_FRONTIER": 2_000_000,
+			"KEEP_FRONTIER": 1_200_000,
+			"COMPACTION_GAP": 700_000,
+			"BLOOM_BITS": 48_000_000,
 			"BLOOM_HASH_COUNT": 4,
 		}
 
 	if cpu_count >= 12:
 		return {
-			"MAX_VISITED": 700000,
-			"MAX_FRONTIER": 1_000_000,
-			"KEEP_FRONTIER": 420000,
-			"COMPACTION_GAP": 240000,
-			"BLOOM_BITS": 24_000_000,
-			"BLOOM_HASH_COUNT": 5,
+			"MAX_VISITED": 16_000_000,
+			"MAX_FRONTIER": 8_000_000,
+			"KEEP_FRONTIER": 4_500_000,
+			"COMPACTION_GAP": 2_000_000,
+			"BLOOM_BITS": 120_000_000,
+			"BLOOM_HASH_COUNT": 6,
 		}
 
 	if cpu_count >= 8:
 		return {
-			"MAX_VISITED": 500000,
-			"MAX_FRONTIER": 720000,
-			"KEEP_FRONTIER": 320000,
-			"COMPACTION_GAP": 180000,
-			"BLOOM_BITS": 18_000_000,
-			"BLOOM_HASH_COUNT": 4,
+			"MAX_VISITED": 12_000_000,
+			"MAX_FRONTIER": 6_000_000,
+			"KEEP_FRONTIER": 3_500_000,
+			"COMPACTION_GAP": 1_500_000,
+			"BLOOM_BITS": 96_000_000,
+			"BLOOM_HASH_COUNT": 5,
 		}
 
 	return {
-		"MAX_VISITED": 260000,
-		"MAX_FRONTIER": 360000,
-		"KEEP_FRONTIER": 170000,
-		"COMPACTION_GAP": 100000,
-		"BLOOM_BITS": 10_000_000,
+		"MAX_VISITED": 6_000_000,
+		"MAX_FRONTIER": 3_000_000,
+		"KEEP_FRONTIER": 1_800_000,
+		"COMPACTION_GAP": 900_000,
+		"BLOOM_BITS": 64_000_000,
 		"BLOOM_HASH_COUNT": 4,
 	}
 
@@ -134,6 +134,7 @@ def _build_mode_profiles(limits: dict) -> dict:
 			"RETURN_FIRST_GOAL": True,
 			"USE_INCUMBENT_COST_BOUND": True,
 			"FALLBACK_MODES": ("speed", "memory"),
+			"ENABLE_ANTI_CYCLE": True,
 		},
 		"speed": {
 			"MAX_VISITED": max_visited,
@@ -152,6 +153,7 @@ def _build_mode_profiles(limits: dict) -> dict:
 			"RETURN_FIRST_GOAL": False,
 			"USE_INCUMBENT_COST_BOUND": True,
 			"FALLBACK_MODES": ("memory",),
+			"ENABLE_ANTI_CYCLE": True,
 		},
 		"memory": {
 			"MAX_VISITED": int(max_visited * 2.0),
@@ -170,10 +172,11 @@ def _build_mode_profiles(limits: dict) -> dict:
 			"RETURN_FIRST_GOAL": True,
 			"USE_INCUMBENT_COST_BOUND": False,
 			"FALLBACK_MODES": (),
+			"ENABLE_ANTI_CYCLE": False,
 		},
 	}
 
 
 UCS_MODE_PROFILES = _build_mode_profiles(_machine_limits())
 UCS_RUNTIME_LOG_ENABLED = os.environ.get("UCS_RUNTIME_LOG", "1") != "0"
-UCS_RUNTIME_LOG_INTERVAL_SECONDS = float(os.environ.get("UCS_RUNTIME_LOG_INTERVAL", "1.0"))
+UCS_RUNTIME_LOG_INTERVAL_SECONDS = float(os.environ.get("UCS_RUNTIME_LOG_INTERVAL", "10.0"))

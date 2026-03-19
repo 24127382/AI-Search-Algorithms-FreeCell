@@ -159,6 +159,7 @@ class UCSAlgorithm:
             "generated_nodes": 0,
             "stale_heap_pops": 0,
             "pruned_by_cost": 0,
+            "pruned_by_anti_cycle": 0,
             "peak_frontier_size": 1,
             "peak_visited_size": 1,
             "peak_state_cache_size": 1,
@@ -298,11 +299,23 @@ class UCSAlgorithm:
                 incoming_edge_move_ids = edge_move_ids_arena[current_node_index]
                 last_move = move_pool[incoming_edge_move_ids[-1]] if incoming_edge_move_ids else None
                 candidate_moves = get_valid_moves(current_state, last_move=last_move)
+                preview_by_move_id = {}
 
                 move_cap = mode_config["MAX_MOVES_PER_STATE"]
                 if move_cap > 0 and len(candidate_moves) > move_cap:
-                    candidate_moves.sort(key=lambda move: ucs_move_cost(move, prev_state=current_state))
-                    candidate_moves = candidate_moves[:move_cap]
+                    ranked_moves = []
+                    for move in candidate_moves:
+                        preview_next_state, preview_forced_moves = apply_move_with_forced(current_state, move)
+                        preview_edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=preview_next_state)
+                        if preview_forced_moves:
+                            preview_edge_cost += sum(ucs_move_cost(applied_move) for applied_move in preview_forced_moves)
+
+                        move_key = id(move)
+                        preview_by_move_id[move_key] = (preview_next_state, preview_forced_moves, preview_edge_cost)
+                        ranked_moves.append((preview_edge_cost, move))
+
+                    ranked_moves.sort(key=lambda item: item[0])
+                    candidate_moves = [move for _, move in ranked_moves[:move_cap]]
 
                 partial_width = mode_config["PARTIAL_EXPANSION_WIDTH"]
                 if partial_width > 0 and len(candidate_moves) > partial_width:
@@ -310,14 +323,27 @@ class UCSAlgorithm:
                     candidate_moves = candidate_moves[:partial_width]
 
                 for move in candidate_moves:
-                    next_state, forced_moves = apply_move_with_forced(current_state, move)
+                    preview = preview_by_move_id.get(id(move))
+                    if preview is None:
+                        next_state, forced_moves = apply_move_with_forced(current_state, move)
+                        edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=next_state)
+                        if forced_moves:
+                            edge_cost += sum(ucs_move_cost(applied_move) for applied_move in forced_moves)
+                    else:
+                        next_state, forced_moves, edge_cost = preview
+
                     edge_moves = (move, *forced_moves)
                     next_state_id = state_id(next_state)
-                    edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=next_state)
-                    if forced_moves:
-                        edge_cost += sum(ucs_move_cost(applied_move) for applied_move in forced_moves)
                     new_cost = cost + edge_cost
                     stats["generated_nodes"] += 1
+
+                    if mode_config.get("ENABLE_ANTI_CYCLE", False):
+                        parent_index = parent_index_arena[current_node_index]
+                        if parent_index >= 0:
+                            grandparent_state_id = state_id_arena[parent_index]
+                            if next_state_id == grandparent_state_id:
+                                stats["pruned_by_anti_cycle"] += 1
+                                continue
 
                     if mode_config["EARLY_GOAL_BOUNDING"] and incumbent_goal_cost is not None and new_cost >= incumbent_goal_cost:
                         stats["pruned_by_cost"] += 1
