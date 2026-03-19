@@ -195,7 +195,7 @@ def find_valid_destinations(
 
     valid_destinations = []
     base_card = sequence[0]
-    
+
     if len(sequence) == 1:
         for f_idx, foundation in enumerate(state.foundations):
             if can_move_to_foundation(base_card, foundation, f_idx):
@@ -207,7 +207,7 @@ def find_valid_destinations(
                     sequence=tuple(sequence),
                 )
                 valid_destinations.append(move)
-    
+
     for t_idx, tableau_col in enumerate(state.tableau):
         if from_pos[0] == 'tableau' and t_idx == from_pos[1]:
             continue
@@ -218,7 +218,7 @@ def find_valid_destinations(
                 max_to_empty = get_max_sequence_to_empty_tableau(state)
                 if len(sequence) > max_to_empty:
                     is_valid_len = False
-            
+
             if is_valid_len:
                 move = Move(
                     MoveType.TABLEAU_TO_TABLEAU if from_pos[0] == 'tableau' else MoveType.FREECELL_TO_TABLEAU,
@@ -228,7 +228,7 @@ def find_valid_destinations(
                     sequence=tuple(sequence),
                 )
                 valid_destinations.append(move)
-    
+
     if len(sequence) == 1 and from_pos[0] == 'tableau':
         for c_idx, cell in enumerate(state.freecells):
             if cell is None:
@@ -240,7 +240,7 @@ def find_valid_destinations(
                     sequence=tuple(sequence),
                 )
                 valid_destinations.append(move)
-    
+
     return valid_destinations
 
 
