@@ -20,7 +20,7 @@ LOCATIONS = ['tableau', 'freecell', 'foundation']
 @dataclass(frozen=True)
 class Card:
     """Playing card with suit and rank.
-    
+
     Example:
         card = Card(suit='hearts', rank='A')
     """
@@ -38,19 +38,19 @@ class Card:
 @dataclass(frozen=True)
 class State:
     """Game state snapshot: tableau, freecells, and foundations.
-    
+
     Workflow - How to use State:
         1. Copy current state: new_tableau = [list(col) for col in current_state.tableau]
         2. Apply action: new_tableau[0].pop()  # Move a card
         3. Create new State: new_state = State(new_tableau, freecells, foundations)
         4. Use new_state for next iteration (old state remains unchanged)
-    
+
     Why immutable? Enables hashing for visited set in search algorithms.
     """""
     tableau: Tuple[Tuple[Card, ...], ...]  # 8 columns of cards
     freecells: Tuple[Card, ...]  # 4 free cells for temporary storage
     foundations: Tuple[Tuple[Card, ...], ...]  # 4 foundation piles (one per suit)
-    
+
     def __init__(self, tableau: List[List[Card]], freecells: List[Optional[Card]], foundations: List[List[Card]]):
         # Convert list to tuple to ensure immutability and hashability with each state is unique
         object.__setattr__(self, 'tableau', tuple(tuple(col) for col in tableau))
@@ -61,10 +61,10 @@ class State:
         """Check if two states are equal."""
         if not isinstance(other, State):
             return False
-        return (self.tableau == other.tableau and 
-                self.freecells == other.freecells and 
+        return (self.tableau == other.tableau and
+                self.freecells == other.freecells and
                 self.foundations == other.foundations)
-       
+
     def __hash__(self):
         """Hash for visited set in search algorithms."""
         return hash((self.tableau, self.freecells, self.foundations))
