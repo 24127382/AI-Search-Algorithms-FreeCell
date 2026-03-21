@@ -1,17 +1,11 @@
 """Uniform Cost Search solver."""
 
+import os
 from time import perf_counter
-from heapq import heapify, heappop, heappush, nsmallest
+from heapq import heappop, heappush
 
 from backend.engine.engine import apply_move_with_forced, get_valid_moves
-from backend.solver.ucs.ucs_profile import (
-    UCS_MODE_PROFILES,
-    UCS_RUNTIME_LOG_ENABLED,
-    UCS_RUNTIME_LOG_INTERVAL_SECONDS,
-)
 from backend.solver.ucs.ucs_utils import (
-    BloomFilter,
-    compact_ucs_structures,
     decode_edge_moves,
     encode_edge_moves,
     state_id,
@@ -19,40 +13,26 @@ from backend.solver.ucs.ucs_utils import (
 )
 
 
+UCS_RUNTIME_LOG_ENABLED = os.environ.get("UCS_RUNTIME_LOG", "1") != "0"
+# UCS_RUNTIME_LOG_INTERVAL_SECONDS = float(os.environ.get("UCS_RUNTIME_LOG_INTERVAL", "10.0"))
+
+
 class UCSAlgorithm:
-    """Uniform-Cost Search with configurable performance/memory trade-offs.
+    """Uniform-Cost Search with exact single-mode execution.
 
     Attributes:
         game_state: Initial search state.
-        mode: Active UCS mode key.
         last_run_stats: Statistics from last completed run.
     """
 
-    VALID_MODES = {"first", "speed", "memory"}
-
-    def __init__(self, game_state, mode="speed"):
-        """Initialize UCS with a fixed start state and execution mode.
+    def __init__(self, game_state):
+        """Initialize UCS with a fixed start state.
 
         Args:
             game_state: Initial search state.
-            mode: UCS mode key in `VALID_MODES`.
-
-        Raises:
-            ValueError: If mode is unsupported.
         """
         self.game_state = game_state
-        if mode not in self.VALID_MODES:
-            raise ValueError(f"Unsupported UCS mode: {mode}")
-        self.mode = mode
         self.last_run_stats = None
-
-    def _mode_config(self):
-        """Resolve runtime tuning knobs for current mode.
-
-        Returns:
-            dict: Mode configuration mapping.
-        """
-        return UCS_MODE_PROFILES[self.mode]
 
     def _finalize_stats(self, stats, started_at, solution_found):
         """Finalize and persist run statistics.
@@ -62,32 +42,52 @@ class UCSAlgorithm:
             started_at: Run start timestamp.
             solution_found: Whether run found a solution.
         """
-        stats["elapsed_seconds"] = perf_counter() - started_at
+        stats["elapsed_ms"] = (perf_counter() - started_at) * 1000
         stats["solution_found"] = solution_found
+        expanded_nodes = max(stats.get("expanded_nodes", 0), 1)
+        generated_nodes = stats.get("generated_nodes", 0)
+        dominance_pruned = stats.get("dominance_pruned", 0)
+        stats["effective_branching_factor"] = generated_nodes / expanded_nodes
+        stats["dominance_prune_rate"] = dominance_pruned / max(generated_nodes, 1)
         self.last_run_stats = stats
 
-    def _log_progress(self, started_at, stats, frontier_size, visited_size, window_expanded, window_seconds):
-        """Print periodic runtime telemetry for long UCS runs.
+    def format_last_run_stats(self) -> str:
+        """Build a compact human-readable report for `last_run_stats`.
 
-        Args:
-            started_at: Run start timestamp.
-            stats: Current run statistics.
-            frontier_size: Current frontier node count.
-            visited_size: Current visited-node map size.
-            window_expanded: Nodes expanded in logging window.
-            window_seconds: Logging window duration in seconds.
+        Returns:
+            str: Multiline summary string.
         """
-        elapsed = max(perf_counter() - started_at, 1e-9)
-        window_nodes_per_sec = window_expanded / max(window_seconds, 1e-9)
-        print(
-            "[UCS][Run] "
-            f"mode={self.mode} "
-            f"t={elapsed:.1f}s "
-            f"frontier={frontier_size} "
-            f"visited={visited_size} "
-            f"expanded={stats['expanded_nodes']} "
-            f"expanded/s={window_nodes_per_sec:.1f}"
-        )
+        if not self.last_run_stats:
+            return "No UCS stats available. Run search() first."
+
+        stats = self.last_run_stats
+        solution_cost = stats.get("solution_cost")
+        solution_cost_text = "n/a" if solution_cost is None else str(solution_cost)
+
+        lines = [
+            "UCS Run Stats",
+            f"- solution_found: {stats.get('solution_found', False)}",
+            f"- elapsed_ms: {stats.get('elapsed_ms', 0.0):.2f}",
+            f"- solution_length: {stats.get('solution_length', 0)}",
+            f"- solution_cost: {solution_cost_text}",
+            f"- expanded_nodes: {stats.get('expanded_nodes', 0)}",
+            f"- generated_nodes: {stats.get('generated_nodes', 0)}",
+            f"- stale_heap_pops: {stats.get('stale_heap_pops', 0)}",
+            f"- dominance_pruned: {stats.get('dominance_pruned', 0)}",
+            f"- dominance_prune_rate: {stats.get('dominance_prune_rate', 0.0):.2%}",
+            f"- effective_branching_factor: {stats.get('effective_branching_factor', 0.0):.3f}",
+            f"- peak_frontier_size: {stats.get('peak_frontier_size', 0)}",
+            f"- peak_visited_size: {stats.get('peak_visited_size', 0)}",
+            f"- peak_state_cache_size: {stats.get('peak_state_cache_size', 0)}",
+            f"- final_frontier_size: {stats.get('final_frontier_size', 0)}",
+            f"- final_visited_size: {stats.get('final_visited_size', 0)}",
+            f"- move_pool_size: {stats.get('move_pool_size', 0)}",
+        ]
+        return "\n".join(lines)
+
+    def _log_progress(self):
+        """Print full runtime summary after a UCS run ends."""
+        print(self.format_last_run_stats())
 
     @staticmethod
     def _priority_bias(state) -> int:
@@ -136,14 +136,11 @@ class UCSAlgorithm:
         path.reverse()
         return path
 
-    def _search_once(self, mode_config):
-        """Run one UCS pass under a specific mode configuration.
-
-        Args:
-            mode_config: Runtime configuration dictionary.
+    def search(self):
+        """Run UCS and return an optimal path if one exists.
 
         Returns:
-            list | None: Found solution path, or `None` if unsolved.
+            list | None: Solution path, or `None` when no solution was found.
         """
         started_at = perf_counter()
         counter = 0
@@ -154,91 +151,29 @@ class UCSAlgorithm:
         heappush(frontier, (0, self._priority_bias(start_state), counter, start_state_id))
 
         stats = {
-            "mode": self.mode,
             "expanded_nodes": 0,
             "generated_nodes": 0,
             "stale_heap_pops": 0,
-            "pruned_by_cost": 0,
-            "pruned_by_anti_cycle": 0,
+            "dominance_pruned": 0,
             "peak_frontier_size": 1,
             "peak_visited_size": 1,
             "peak_state_cache_size": 1,
             "move_pool_size": 0,
-            "pruned_by_bloom": 0,
-            "partial_expansion_skipped": 0,
-            "batch_pop_count": 0,
-            "goal_candidates_found": 0,
+            "solution_cost": None,
+            "solution_length": 0,
         }
 
         best_cost = {start_state_id: 0}
         best_node_index = {start_state_id: 0}
         parent_index_arena = [-1]
         edge_move_ids_arena = [()]
-        state_id_arena = [start_state_id]
 
         move_pool = []
         move_index_by_signature = {}
-        bloom_filter = (
-            BloomFilter(mode_config["BLOOM_BITS"], mode_config["BLOOM_HASH_COUNT"])
-            if mode_config["ENABLE_BLOOM"]
-            else None
-        )
-        if bloom_filter is not None:
-            bloom_filter.add(start_state_id)
 
         state_cache = {start_state_id: start_state}
-        next_compaction_at = mode_config["MAX_VISITED"]
-        incumbent_goal_cost = None
-        incumbent_path = None
-
-        next_log_at = started_at + max(UCS_RUNTIME_LOG_INTERVAL_SECONDS, 0.1)
-        last_log_time = started_at
-        last_log_expanded = 0
-
+    
         while frontier:
-            if UCS_RUNTIME_LOG_ENABLED and perf_counter() >= next_log_at:
-                now = perf_counter()
-                window_seconds = now - last_log_time
-                window_expanded = stats["expanded_nodes"] - last_log_expanded
-                self._log_progress(started_at, stats, len(frontier), len(best_cost), window_expanded, window_seconds)
-                last_log_time = now
-                last_log_expanded = stats["expanded_nodes"]
-                next_log_at = now + max(UCS_RUNTIME_LOG_INTERVAL_SECONDS, 0.1)
-
-            if mode_config["USE_INCUMBENT_COST_BOUND"] and incumbent_goal_cost is not None and frontier[0][0] >= incumbent_goal_cost:
-                stats["move_pool_size"] = len(move_pool)
-                self._finalize_stats(stats, started_at, solution_found=incumbent_path is not None)
-                if UCS_RUNTIME_LOG_ENABLED:
-                    now = perf_counter()
-                    window_seconds = now - last_log_time
-                    window_expanded = stats["expanded_nodes"] - last_log_expanded
-                    self._log_progress(started_at, stats, len(frontier), len(best_cost), window_expanded, window_seconds)
-                return incumbent_path
-
-            if mode_config["ENABLE_FRONTIER_TRUNCATION"] and len(frontier) >= mode_config["MAX_FRONTIER"]:
-                frontier = nsmallest(mode_config["KEEP_FRONTIER"], frontier)
-                heapify(frontier)
-                keep_frontier_ids = {node_state_id for _, _, _, node_state_id in frontier}
-                state_cache = {
-                    node_state_id: state
-                    for node_state_id, state in state_cache.items()
-                    if node_state_id in keep_frontier_ids
-                }
-
-            if mode_config["ENABLE_ARENA_COMPACTION"] and len(best_cost) >= next_compaction_at and frontier:
-                compact_ucs_structures(
-                    frontier,
-                    frontier[0][-1],
-                    mode_config["KEEP_FRONTIER"],
-                    best_cost,
-                    best_node_index,
-                    parent_index_arena,
-                    edge_move_ids_arena,
-                    state_id_arena,
-                    state_cache,
-                )
-                next_compaction_at = max(mode_config["MAX_VISITED"], len(best_cost) + mode_config["COMPACTION_GAP"])
-
             if len(frontier) > stats["peak_frontier_size"]:
                 stats["peak_frontier_size"] = len(frontier)
             if len(best_cost) > stats["peak_visited_size"]:
@@ -246,166 +181,70 @@ class UCSAlgorithm:
             if len(state_cache) > stats["peak_state_cache_size"]:
                 stats["peak_state_cache_size"] = len(state_cache)
 
-            pop_batch_size = mode_config["BATCH_EXPANSION_SIZE"]
-            min_batch_cost = frontier[0][0]
-            batch = []
-            while frontier and len(batch) < pop_batch_size and frontier[0][0] == min_batch_cost:
-                cost, _, _, current_state_id = heappop(frontier)
-
-                best_known_cost = best_cost.get(current_state_id)
-                if best_known_cost is None or cost != best_known_cost:
-                    stats["stale_heap_pops"] += 1
-                    continue
-
-                current_node_index = best_node_index.get(current_state_id)
-                if current_node_index is None:
-                    stats["stale_heap_pops"] += 1
-                    continue
-
-                current_state = state_cache.pop(current_state_id, None)
-                if current_state is None:
-                    stats["stale_heap_pops"] += 1
-                    continue
-
-                batch.append((cost, current_state_id, current_node_index, current_state))
-
-            if not batch:
+            cost, _, _, current_state_id = heappop(frontier)
+            best_known_cost = best_cost.get(current_state_id)
+            if best_known_cost is None or cost != best_known_cost:
+                stats["stale_heap_pops"] += 1
                 continue
 
-            stats["batch_pop_count"] += 1
+            current_node_index = best_node_index.get(current_state_id)
+            if current_node_index is None:
+                stats["stale_heap_pops"] += 1
+                continue
 
-            for cost, _, current_node_index, current_state in batch:
-                stats["expanded_nodes"] += 1
+            current_state = state_cache.pop(current_state_id, None)
+            if current_state is None:
+                stats["stale_heap_pops"] += 1
+                continue
 
-                if current_state.is_goal:
-                    stats["goal_candidates_found"] += 1
-                    path = self._reconstruct_path(current_node_index, parent_index_arena, edge_move_ids_arena, move_pool)
+            stats["expanded_nodes"] += 1
 
-                    if mode_config["RETURN_FIRST_GOAL"]:
-                        stats["move_pool_size"] = len(move_pool)
-                        self._finalize_stats(stats, started_at, solution_found=True)
-                        if UCS_RUNTIME_LOG_ENABLED:
-                            now = perf_counter()
-                            window_seconds = now - last_log_time
-                            window_expanded = stats["expanded_nodes"] - last_log_expanded
-                            self._log_progress(started_at, stats, len(frontier), len(best_cost), window_expanded, window_seconds)
-                        return path
+            if current_state.is_goal:
+                path = self._reconstruct_path(current_node_index, parent_index_arena, edge_move_ids_arena, move_pool)
+                stats["move_pool_size"] = len(move_pool)
+                stats["solution_cost"] = cost
+                stats["solution_length"] = len(path)
+                stats["final_frontier_size"] = len(frontier)
+                stats["final_visited_size"] = len(best_cost)
+                self._finalize_stats(stats, started_at, solution_found=True)
+                if UCS_RUNTIME_LOG_ENABLED:
+                    self._log_progress()
+                return path
 
-                    if incumbent_goal_cost is None or cost < incumbent_goal_cost:
-                        incumbent_goal_cost = cost
-                        incumbent_path = path
+            incoming_edge_move_ids = edge_move_ids_arena[current_node_index]
+            last_move = move_pool[incoming_edge_move_ids[-1]] if incoming_edge_move_ids else None
+            candidate_moves = get_valid_moves(current_state, last_move=last_move)
+
+            for move in candidate_moves:
+                next_state, forced_moves = apply_move_with_forced(current_state, move)
+                edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=next_state)
+                if forced_moves:
+                    edge_cost += sum(ucs_move_cost(applied_move) for applied_move in forced_moves)
+
+                edge_moves = (move, *forced_moves)
+                next_state_id = state_id(next_state)
+                new_cost = cost + edge_cost
+                stats["generated_nodes"] += 1
+
+                old_cost = best_cost.get(next_state_id)
+                if old_cost is not None and new_cost >= old_cost:
+                    stats["dominance_pruned"] += 1
                     continue
 
-                incoming_edge_move_ids = edge_move_ids_arena[current_node_index]
-                last_move = move_pool[incoming_edge_move_ids[-1]] if incoming_edge_move_ids else None
-                candidate_moves = get_valid_moves(current_state, last_move=last_move)
-                preview_by_move_id = {}
-
-                move_cap = mode_config["MAX_MOVES_PER_STATE"]
-                if move_cap > 0 and len(candidate_moves) > move_cap:
-                    ranked_moves = []
-                    for move in candidate_moves:
-                        preview_next_state, preview_forced_moves = apply_move_with_forced(current_state, move)
-                        preview_edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=preview_next_state)
-                        if preview_forced_moves:
-                            preview_edge_cost += sum(ucs_move_cost(applied_move) for applied_move in preview_forced_moves)
-
-                        move_key = id(move)
-                        preview_by_move_id[move_key] = (preview_next_state, preview_forced_moves, preview_edge_cost)
-                        ranked_moves.append((preview_edge_cost, move))
-
-                    ranked_moves.sort(key=lambda item: item[0])
-                    candidate_moves = [move for _, move in ranked_moves[:move_cap]]
-
-                partial_width = mode_config["PARTIAL_EXPANSION_WIDTH"]
-                if partial_width > 0 and len(candidate_moves) > partial_width:
-                    stats["partial_expansion_skipped"] += len(candidate_moves) - partial_width
-                    candidate_moves = candidate_moves[:partial_width]
-
-                for move in candidate_moves:
-                    preview = preview_by_move_id.get(id(move))
-                    if preview is None:
-                        next_state, forced_moves = apply_move_with_forced(current_state, move)
-                        edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=next_state)
-                        if forced_moves:
-                            edge_cost += sum(ucs_move_cost(applied_move) for applied_move in forced_moves)
-                    else:
-                        next_state, forced_moves, edge_cost = preview
-
-                    edge_moves = (move, *forced_moves)
-                    next_state_id = state_id(next_state)
-                    new_cost = cost + edge_cost
-                    stats["generated_nodes"] += 1
-
-                    if mode_config.get("ENABLE_ANTI_CYCLE", False):
-                        parent_index = parent_index_arena[current_node_index]
-                        if parent_index >= 0:
-                            grandparent_state_id = state_id_arena[parent_index]
-                            if next_state_id == grandparent_state_id:
-                                stats["pruned_by_anti_cycle"] += 1
-                                continue
-
-                    if mode_config["EARLY_GOAL_BOUNDING"] and incumbent_goal_cost is not None and new_cost >= incumbent_goal_cost:
-                        stats["pruned_by_cost"] += 1
-                        continue
-
-                    old_cost = best_cost.get(next_state_id)
-                    if old_cost is not None and new_cost >= old_cost:
-                        stats["pruned_by_cost"] += 1
-                        continue
-
-                    if bloom_filter is not None and old_cost is None and bloom_filter.maybe_contains(next_state_id):
-                        stats["pruned_by_bloom"] += 1
-                        continue
-
-                    edge_move_ids = encode_edge_moves(edge_moves, move_index_by_signature, move_pool)
-                    node_index = len(parent_index_arena)
-                    best_cost[next_state_id] = new_cost
-                    best_node_index[next_state_id] = node_index
-                    parent_index_arena.append(current_node_index)
-                    edge_move_ids_arena.append(edge_move_ids)
-                    state_id_arena.append(next_state_id)
-                    state_cache[next_state_id] = next_state
-                    if bloom_filter is not None:
-                        bloom_filter.add(next_state_id)
-                    counter += 1
-                    heappush(frontier, (new_cost, self._priority_bias(next_state), counter, next_state_id))
+                edge_move_ids = encode_edge_moves(edge_moves, move_index_by_signature, move_pool)
+                node_index = len(parent_index_arena)
+                best_cost[next_state_id] = new_cost
+                best_node_index[next_state_id] = node_index
+                parent_index_arena.append(current_node_index)
+                edge_move_ids_arena.append(edge_move_ids)
+                state_cache[next_state_id] = next_state
+                counter += 1
+                heappush(frontier, (new_cost, self._priority_bias(next_state), counter, next_state_id))
 
         stats["move_pool_size"] = len(move_pool)
-        if incumbent_path is not None:
-            self._finalize_stats(stats, started_at, solution_found=True)
-            if UCS_RUNTIME_LOG_ENABLED:
-                now = perf_counter()
-                window_seconds = now - last_log_time
-                window_expanded = stats["expanded_nodes"] - last_log_expanded
-                self._log_progress(started_at, stats, len(frontier), len(best_cost), window_expanded, window_seconds)
-            return incumbent_path
-
+        stats["final_frontier_size"] = len(frontier)
+        stats["final_visited_size"] = len(best_cost)
         self._finalize_stats(stats, started_at, solution_found=False)
         if UCS_RUNTIME_LOG_ENABLED:
-            now = perf_counter()
-            window_seconds = now - last_log_time
-            window_expanded = stats["expanded_nodes"] - last_log_expanded
-            self._log_progress(started_at, stats, len(frontier), len(best_cost), window_expanded, window_seconds)
-        return None
-
-    def search(self):
-        """Run UCS and optional fallback modes.
-
-        Returns:
-            list | None: Solution path, or `None` when no solution was found.
-        """
-        mode_config = self._mode_config()
-        path = self._search_once(mode_config)
-        if path is not None:
-            return path
-
-        for fallback_mode in mode_config.get("FALLBACK_MODES", ()): 
-            fallback_solver = UCSAlgorithm(self.game_state, mode=fallback_mode)
-            fallback_path = fallback_solver.search()
-            if fallback_path is not None:
-                self.last_run_stats = dict(fallback_solver.last_run_stats or {})
-                self.last_run_stats["fallback_from"] = self.mode
-                return fallback_path
-
+            self._log_progress()
         return None
