@@ -236,13 +236,13 @@ def _apply_single_move(state: State, move: Move) -> State:
     new_tableau = [list(col) for col in state.tableau]
     new_freecells = list(state.freecells)
     new_foundations = [list(f) for f in state.foundations]
-    
+
     from_type, from_idx = move.from_pos
     to_type, to_idx = move.to_pos
     touched_tableau_indices = set()
-    
+
     moving_cards = list(move.sequence) if move.sequence else [move.card]
-    
+
     if from_type == 'tableau':
         if not move.sequence:
             raise ValueError("Tableau moves must include move.sequence to avoid ambiguous state transitions")
@@ -256,7 +256,7 @@ def _apply_single_move(state: State, move: Move) -> State:
         touched_tableau_indices.add(from_idx)
     elif from_type == 'freecell':
         new_freecells[from_idx] = None
-    
+
     if to_type == 'tableau':
         new_tableau[to_idx].extend(moving_cards)
         touched_tableau_indices.add(to_idx)
@@ -272,7 +272,6 @@ def _apply_single_move(state: State, move: Move) -> State:
         foundations=new_foundations,
         touched_tableau_indices=touched_tableau_indices,
     )
-
 
 def apply_move(state: State, move: Move, collapse_forced: bool = False) -> State:
     """Apply one move with optional forced-foundation closure.
