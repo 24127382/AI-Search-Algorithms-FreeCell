@@ -143,39 +143,51 @@ class BoardSolverMixin:
 		"""
 		if run_id != self._active_solver_run_id:
 			return
-		elapsed = time.perf_counter() - self._solve_started_at if self._solve_started_at else 0.0
-		if not path:
-			self._emit_status(f"{algo} failed to find a solution after {elapsed:.1f}s.")
-			return
+		try:
+			elapsed = time.perf_counter() - self._solve_started_at if self._solve_started_at else 0.0
+			if not path:
+				self._emit_status(f"{algo} failed to find a solution after {elapsed:.1f}s.")
+				return
 
-		self._emit_status(f"Found a solution in {len(path)} moves ({elapsed:.1f}s). Replaying...")
+			self._emit_status(f"Found a solution in {len(path)} moves ({elapsed:.1f}s). Replaying...")
 
-		self.solve_path = path
-		self.solve_timer = QTimer(self)
-		self.solve_timer.timeout.connect(self._replay_next_solver_move)
-		self.solve_timer.start(140)
+			self.solve_path = path
+			self.solve_timer = QTimer(self)
+			self.solve_timer.timeout.connect(self._replay_next_solver_move)
+			self.solve_timer.start(140)
+		except Exception as e:
+			self._emit_status(f"Error processing solver result: {e}")
+			import traceback
+			traceback.print_exc()
 
 	def _replay_next_solver_move(self):
 		"""Apply one solver move per timer tick until path is exhausted."""
-		if not hasattr(self, "solve_path") or not self.solve_path:
+		try:
+			if not hasattr(self, "solve_path") or not self.solve_path:
+				if hasattr(self, "solve_timer") and self.solve_timer:
+					self.solve_timer.stop()
+				self._emit_status("Auto-solve complete.")
+				return
+
+			move = self.solve_path.pop(0)
+			self.history.append(self.state)
+			self.state = apply_move(self.state, move)
+			self.move_count += 1
+
+			self.move_count_changed.emit(self.move_count)
+			self._render()
+
+			if self.state.is_goal:
+				if hasattr(self, "solve_timer") and self.solve_timer:
+					self.solve_timer.stop()
+				self.game_won.emit()
+				self._emit_status("You won!")
+		except Exception as e:
 			if hasattr(self, "solve_timer") and self.solve_timer:
 				self.solve_timer.stop()
-			self._emit_status("Auto-solve complete.")
-			return
-
-		move = self.solve_path.pop(0)
-		self.history.append(self.state)
-		self.state = apply_move(self.state, move)
-		self.move_count += 1
-
-		self.move_count_changed.emit(self.move_count)
-		self._render()
-
-		if self.state.is_goal:
-			if hasattr(self, "solve_timer") and self.solve_timer:
-				self.solve_timer.stop()
-			self.game_won.emit()
-			self._emit_status("You won!")
+			self._emit_status(f"Error replaying solution: {e}")
+			import traceback
+			traceback.print_exc()
 	
 	def restart(self):
 		"""Restore board to initial deal and clear transient runtime state."""
