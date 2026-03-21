@@ -1,59 +1,52 @@
-'''
-algorithms.py
+"""Backward-compatible SearchAlgorithm facade."""
 
-This module implements search algorithms for freecell.
+from backend.model.state import State
+from backend.solver.astar import AStarAlgorithm
+from backend.solver.bfs import BFSAlgorithm
+from backend.solver.dfs import DFSAlgorithm
+from backend.solver.ucs.ucs import UCSAlgorithm
+from enum import Enum
 
-Algorithms included:
-- BFS
-- DFS
-- UCS
-- A*
-'''
-
-from collections import deque
-
-from backend.engine.engine import apply_move, get_valid_moves, is_goal
-
+class AlgorithmMode(Enum):
+    """High-level UCS policy presets exposed to the UI layer."""
+    FIRST = "first"
+    SPEED = "speed"
+    MEMORY = "memory"
 
 class SearchAlgorithm:
-    def __init__(self, game_state):
+    """Small facade that dispatches to concrete search implementations."""
+
+    def __init__(self, game_state, mode=AlgorithmMode.SPEED.value):
+        """Bind algorithm handlers for a fixed initial game state.
+
+        Args:
+            game_state: Initial board state for solver execution.
+            mode: UCS mode preset used when algorithm is UCS.
+        """
         self.game_state = game_state
-
+        self._handlers = {
+            "BFS": BFSAlgorithm(self.game_state).search,
+            "DFS": DFSAlgorithm(self.game_state).search,
+            "UCS": UCSAlgorithm(self.game_state, mode).search,
+            "A*": AStarAlgorithm(self.game_state).search,
+        }
+        
     def search(self, algorithm, heuristic_func=None):
-        if algorithm == 'BFS':
-            return self._bfs()
-        elif algorithm == 'DFS':
-            return self._dfs()
-        elif algorithm == 'UCS':
-            return self._ucs()
-        elif algorithm == 'A*':
-            return self._a_star(heuristic_func)
-        else:
-            raise ValueError("Unknown algorithm: {}".format(algorithm))
-        
-    def _bfs(self):
-        queue = deque([(self.game_state, [])])
-        visited = {self.game_state}
-        
-        while queue:
-            state, path = queue.popleft()
-            if is_goal(state):
-                return path
-            
-            for move in get_valid_moves(state):
-                new_state = apply_move(state, move)
-                if new_state not in visited:
-                    visited.add(new_state)
-                    queue.append((new_state, path + [move]))
+        """Run the selected solver and return computed path.
 
-        return None  # No solution found
-    
-    def _dfs(self):
-        pass
-    
-    def _ucs(self):
-        pass
-    
-    def _a_star(self):
-        pass
-        
+        Args:
+            algorithm: Solver key (e.g. "BFS", "DFS", "UCS", "A*").
+            heuristic_func: Optional heuristic used only by A*.
+
+        Returns:
+            object: Solver-specific path result.
+
+        Raises:
+            ValueError: If `algorithm` key is unsupported.
+        """
+        handler = self._handlers.get(algorithm)
+        if handler is None:
+            raise ValueError(f"Unknown algorithm: {algorithm}")
+        if algorithm == "A*":
+            return handler(heuristic_func)
+        return handler()
