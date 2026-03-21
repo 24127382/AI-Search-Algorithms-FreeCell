@@ -13,8 +13,8 @@ class AlgorithmMode(Enum):
     SPEED = "speed"
     MEMORY = "memory"
 
-import heapq
-from engine.engine import get_valid_moves, apply_move
+# import heapq
+# from backend.engine.engine import get_valid_moves, apply_move
 
 class SearchAlgorithm:
     """Small facade that dispatches to concrete search implementations."""
@@ -79,6 +79,7 @@ class SearchAlgorithm:
 
     def _a_star(self, heuristic_func):
         """
+        """
         A* search using the provided admissible heuristic.
 
         Each node in the frontier is: (f, g, state, path)
@@ -121,4 +122,4 @@ class SearchAlgorithm:
                     )
 
         return None  # No solution found
-        """
+

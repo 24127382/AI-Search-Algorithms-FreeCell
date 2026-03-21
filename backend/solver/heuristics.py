@@ -1,6 +1,7 @@
 """Heuristic helpers for informed search algorithms."""
 
-from model.models import State, VALID_RANK
+from backend.model.card import VALID_RANK
+from backend.model.state import State
 
 def zero_heuristic(_state) -> int:
 	"""Return zero heuristic value.
