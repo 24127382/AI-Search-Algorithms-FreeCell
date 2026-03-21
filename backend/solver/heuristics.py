@@ -58,10 +58,4 @@ def buried_cards(state: State) -> int:
 
 
 def combined_heuristic(state: State) -> int:
-    """
-    Recommended for A*. Takes the max of h2 and h3.
-
-    max() is always admissible when both components are admissible,
-    and produces a tighter (better-informed) bound than either alone.
-    """
     return max(foundation_distance(state), buried_cards(state))
