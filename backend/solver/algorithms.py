@@ -9,18 +9,20 @@ from backend.solver.ucs.ucs import UCSAlgorithm
 class SearchAlgorithm:
     """Small facade that dispatches to concrete search implementations."""
 
-    def __init__(self, game_state):
+    def __init__(self, game_state, should_cancel=None):
         """Bind algorithm handlers for a fixed initial game state.
 
         Args:
             game_state: Initial board state for solver execution.
+            should_cancel: Optional callable returning True when solve should stop.
         """
         self.game_state = game_state
+        self.should_cancel = should_cancel or (lambda: False)
         self._handlers = {
             "BFS": BFSAlgorithm(self.game_state).search,
             "DFS": DFSAlgorithm(self.game_state).search,
-            "UCS": UCSAlgorithm(self.game_state).search,
-            "A*": AStarAlgorithm(self.game_state).search,
+            "UCS": UCSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
+            "A*": AStarAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
         }
 
     def search(self, algorithm, heuristic_func=combined_heuristic):

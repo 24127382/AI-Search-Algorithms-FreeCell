@@ -25,13 +25,15 @@ class UCSAlgorithm:
         last_run_stats: Statistics from last completed run.
     """
 
-    def __init__(self, game_state):
+    def __init__(self, game_state, should_cancel=None):
         """Initialize UCS with a fixed start state.
 
         Args:
             game_state: Initial search state.
+            should_cancel: Optional callable returning True when search should stop.
         """
         self.game_state = game_state
+        self.should_cancel = should_cancel or (lambda: False)
         self.last_run_stats = None
 
     def _finalize_stats(self, stats, started_at, solution_found):
@@ -174,6 +176,9 @@ class UCSAlgorithm:
         state_cache = {start_state_id: start_state}
     
         while frontier:
+            if self.should_cancel():
+                return None
+
             if len(frontier) > stats["peak_frontier_size"]:
                 stats["peak_frontier_size"] = len(frontier)
             if len(best_cost) > stats["peak_visited_size"]:
@@ -216,6 +221,9 @@ class UCSAlgorithm:
             candidate_moves = get_valid_moves(current_state, last_move=last_move)
 
             for move in candidate_moves:
+                if self.should_cancel():
+                    return None
+
                 next_state, forced_moves = apply_move_with_forced(current_state, move)
                 edge_cost = ucs_move_cost(move, prev_state=current_state, next_state=next_state)
                 if forced_moves:

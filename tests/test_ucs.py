@@ -1,5 +1,3 @@
-import pytest
-
 from backend.engine.engine import apply_move
 from backend.model.card import Card, VALID_RANK, VALID_SUITS
 from backend.model.move import Move, MoveType
@@ -36,10 +34,9 @@ def _replay_path(state: State, path):
 	return current
 
 
-@pytest.mark.parametrize("mode", ["first", "speed", "memory"])
-def test_ucs_solves_near_goal(mode):
+def test_ucs_solves_near_goal():
 	start_state = _build_near_goal_state()
-	solver = UCSAlgorithm(start_state, mode=mode)
+	solver = UCSAlgorithm(start_state)
 
 	path = solver.search()
 
@@ -61,16 +58,28 @@ def test_ucs_returns_empty_path_if_already_goal():
 		foundations=foundations,
 	)
 
-	path = UCSAlgorithm(state, mode="speed").search()
+	path = UCSAlgorithm(state).search()
 
 	assert path == []
 
 
-def test_ucs_rejects_invalid_mode():
-	state = _build_near_goal_state()
+def test_ucs_format_last_run_stats_before_search():
+	solver = UCSAlgorithm(_build_near_goal_state())
+	report = solver.format_last_run_stats()
 
-	with pytest.raises(ValueError, match="Unsupported UCS mode"):
-		UCSAlgorithm(state, mode="invalid")
+	assert report == "No UCS stats available. Run search() first."
+
+
+def test_ucs_format_last_run_stats_after_search_contains_core_metrics():
+	solver = UCSAlgorithm(_build_near_goal_state())
+	solver.search()
+	report = solver.format_last_run_stats()
+
+	assert "UCS Run Stats" in report
+	assert "solution_found:" in report
+	assert "elapsed_ms:" in report
+	assert "expanded_nodes:" in report
+	assert "effective_branching_factor:" in report
 
 
 def test_ucs_cost_foundation_is_cheapest_progress_move():

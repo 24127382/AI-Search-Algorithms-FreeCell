@@ -29,6 +29,7 @@ Path reconstruction — Identical arena/pool approach as UCS so paths are
                       returned as the same list-of-Move objects.
 """
 
+import os
 from heapq import heappop, heappush
 from time import perf_counter
 from typing import Callable, List, Optional
@@ -43,6 +44,9 @@ from backend.solver.ucs.ucs_utils import (
 )
 
 
+ASTAR_RUNTIME_LOG_ENABLED = os.environ.get("ASTAR_RUNTIME_LOG", "1") != "0"
+
+
 class AStarAlgorithm:
     """A* solver that reuses UCS edge costs for g(n).
 
@@ -52,17 +56,77 @@ class AStarAlgorithm:
         last_run_stats: Statistics dict populated after each search() call.
     """
 
-    def __init__(self, game_state, heuristic_func: Optional[Callable] = None):
+    def __init__(self, game_state, heuristic_func: Optional[Callable] = None, should_cancel: Optional[Callable] = None):
         """Initialise A* with a start state and optional default heuristic.
 
         Args:
             game_state:     Initial board state.
             heuristic_func: Admissible heuristic callable h(state) -> int.
                             Defaults to combined_heuristic when omitted.
+            should_cancel:  Optional callable returning True when search should stop.
         """
         self.game_state = game_state
         self.heuristic_func = heuristic_func or combined_heuristic
+        self.should_cancel = should_cancel or (lambda: False)
         self.last_run_stats = None
+
+    def _finalize_stats(self, stats: dict, started_at: float, solution_found: bool) -> None:
+        """Finalize and persist run statistics.
+
+        Args:
+            stats: Mutable stats dictionary.
+            started_at: Run start timestamp from perf_counter().
+            solution_found: Whether run found a valid solution path.
+        """
+        stats["elapsed_ms"] = (perf_counter() - started_at) * 1000
+        stats["solution_found"] = solution_found
+        expanded_nodes = max(stats.get("expanded_nodes", 0), 1)
+        generated_nodes = stats.get("generated_nodes", 0)
+        pruned_by_cost = stats.get("pruned_by_cost", 0)
+        pruned_by_closed = stats.get("pruned_by_closed", 0)
+        stats["effective_branching_factor"] = generated_nodes / expanded_nodes
+        stats["cost_prune_rate"] = pruned_by_cost / max(generated_nodes, 1)
+        stats["closed_prune_rate"] = pruned_by_closed / max(generated_nodes, 1)
+        self.last_run_stats = stats
+
+    def format_last_run_stats(self) -> str:
+        """Build a compact human-readable report for last_run_stats.
+
+        Returns:
+            str: Multiline summary string.
+        """
+        if not self.last_run_stats:
+            return "No A* stats available. Run search() first."
+
+        stats = self.last_run_stats
+        solution_cost = stats.get("solution_cost")
+        solution_cost_text = "n/a" if solution_cost is None else str(solution_cost)
+
+        lines = [
+            "A* Run Stats",
+            f"- solution_found: {stats.get('solution_found', False)}",
+            f"- elapsed_ms: {stats.get('elapsed_ms', 0.0):.2f}",
+            f"- solution_length: {stats.get('solution_length', 0)}",
+            f"- solution_cost: {solution_cost_text}",
+            f"- expanded_nodes: {stats.get('expanded_nodes', 0)}",
+            f"- generated_nodes: {stats.get('generated_nodes', 0)}",
+            f"- stale_heap_pops: {stats.get('stale_heap_pops', 0)}",
+            f"- pruned_by_cost: {stats.get('pruned_by_cost', 0)}",
+            f"- pruned_by_closed: {stats.get('pruned_by_closed', 0)}",
+            f"- cost_prune_rate: {stats.get('cost_prune_rate', 0.0):.2%}",
+            f"- closed_prune_rate: {stats.get('closed_prune_rate', 0.0):.2%}",
+            f"- effective_branching_factor: {stats.get('effective_branching_factor', 0.0):.3f}",
+            f"- peak_frontier_size: {stats.get('peak_frontier_size', 0)}",
+            f"- peak_closed_size: {stats.get('peak_closed_size', 0)}",
+            f"- final_frontier_size: {stats.get('final_frontier_size', 0)}",
+            f"- final_closed_size: {stats.get('final_closed_size', 0)}",
+            f"- move_pool_size: {stats.get('move_pool_size', 0)}",
+        ]
+        return "\n".join(lines)
+
+    def _log_progress(self) -> None:
+        """Print full runtime summary after an A* run ends."""
+        print(self.format_last_run_stats())
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -217,10 +281,15 @@ class AStarAlgorithm:
             "peak_frontier_size": 1,
             "peak_closed_size":   0,
             "move_pool_size":     0,
+            "solution_cost":      None,
+            "solution_length":    0,
         }
 
         # ── Main loop ────────────────────────────────────────────────────────
         while frontier:
+            if self.should_cancel():
+                return None
+
             f, h_val, _, _, current_state_id = heappop(frontier)
 
             # ── Closed-set guard ─────────────────────────────────────────────
@@ -256,9 +325,13 @@ class AStarAlgorithm:
                     move_pool,
                 )
                 stats["move_pool_size"]   = len(move_pool)
-                stats["elapsed_seconds"]  = perf_counter() - started_at
-                stats["solution_found"]   = True
-                self.last_run_stats = stats
+                stats["solution_cost"] = current_g
+                stats["solution_length"] = len(path)
+                stats["final_frontier_size"] = len(frontier)
+                stats["final_closed_size"] = len(closed)
+                self._finalize_stats(stats, started_at, solution_found=True)
+                if ASTAR_RUNTIME_LOG_ENABLED:
+                    self._log_progress()
                 return path
 
             # ── Move generation ──────────────────────────────────────────────
@@ -269,6 +342,9 @@ class AStarAlgorithm:
 
             # ── Expand neighbours ────────────────────────────────────────────
             for move in candidate_moves:
+                if self.should_cancel():
+                    return None
+
                 next_state, forced_moves = apply_move_with_forced(current_state, move)
                 edge_moves    = (move, *forced_moves)
                 next_state_id = state_id(next_state)
@@ -329,8 +405,10 @@ class AStarAlgorithm:
                     stats["peak_frontier_size"] = len(frontier)
 
         # ── Exhausted without solution ────────────────────────────────────────
-        stats["move_pool_size"]  = len(move_pool)
-        stats["elapsed_seconds"] = perf_counter() - started_at
-        stats["solution_found"]  = False
-        self.last_run_stats = stats
+        stats["move_pool_size"] = len(move_pool)
+        stats["final_frontier_size"] = len(frontier)
+        stats["final_closed_size"] = len(closed)
+        self._finalize_stats(stats, started_at, solution_found=False)
+        if ASTAR_RUNTIME_LOG_ENABLED:
+            self._log_progress()
         return None
