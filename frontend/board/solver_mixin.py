@@ -50,25 +50,15 @@ class BoardSolverMixin:
 		self._emit_status("Solver is not running.")
 
 	@staticmethod
-	def _solver_label(algo: str, ucs_mode: str) -> str:
+	def _solver_label(algo: str) -> str:
 		"""Build user-friendly solver label.
 
 		Args:
 			algo: Solver key.
-			ucs_mode: UCS mode key.
 
 		Returns:
 			str: Display label.
 		"""
-		if algo == "UCS":
-			mode_label = {
-				"first": "First Solution",
-				"speed": "Speed + Cost",
-				"memory": "Exact Memory",
-				"fast": "Speed + Cost",
-				"exact": "Exact Memory",
-			}.get(ucs_mode, ucs_mode)
-			return f"UCS ({mode_label})"
 		return algo
 
 	def undo(self):
@@ -82,12 +72,11 @@ class BoardSolverMixin:
 		self._render()
 		self._emit_status("Undid 1 move.")
 
-	def solve_with_algo(self, algo: str, ucs_mode: str = "speed"):
+	def solve_with_algo(self, algo: str):
 		"""Start background solve job and prepare replay callbacks.
 
 		Args:
 			algo: Solver key to run.
-			ucs_mode: UCS mode key when `algo` is UCS.
 		"""
 		if self.state is None:
 			return
@@ -99,12 +88,12 @@ class BoardSolverMixin:
 		self.is_solving = True
 		self.solver_running_changed.emit(True)
 		self._solve_started_at = time.perf_counter()
-		solver_label = self._solver_label(algo, ucs_mode)
+		solver_label = self._solver_label(algo)
 		self._emit_status(f"Solving with {solver_label}...")
 		run_id = self._active_solver_run_id + 1
 		self._active_solver_run_id = run_id
 
-		self.solver_thread = SolverThread(self.state, algo, ucs_mode=ucs_mode)
+		self.solver_thread = SolverThread(self.state, algo)
 		self.solver_thread.result_ready.connect(lambda path, label=solver_label, current_run_id=run_id: self._on_solver_finished(label, path, current_run_id))
 		self.solver_thread.error_occurred.connect(lambda error, label=solver_label, current_run_id=run_id: self._on_solver_error(label, error, current_run_id))
 		self.solver_thread.finished.connect(lambda current_run_id=run_id: self._on_solver_thread_finished(current_run_id))
@@ -143,12 +132,12 @@ class BoardSolverMixin:
 		"""
 		if run_id != self._active_solver_run_id:
 			return
-		elapsed = time.perf_counter() - self._solve_started_at if self._solve_started_at else 0.0
+		elapsed_ms = ((time.perf_counter() - self._solve_started_at) * 1000) if self._solve_started_at else 0.0
 		if not path:
-			self._emit_status(f"{algo} failed to find a solution after {elapsed:.1f}s.")
+			self._emit_status(f"{algo} failed to find a solution after {elapsed_ms:.0f}ms.")
 			return
 
-		self._emit_status(f"Found a solution in {len(path)} moves ({elapsed:.1f}s). Replaying...")
+		self._emit_status(f"Found a solution in {len(path)} moves ({elapsed_ms:.0f}ms). Replaying...")
 
 		self.solve_path = path
 		self.solve_timer = QTimer(self)

@@ -7,13 +7,13 @@ SOLVER_ALGORITHMS = ("BFS", "DFS", "UCS", "A*")
 
 
 class ControlPanel(QWidget):
-	"""Action toolbar exposing game controls and solver mode choices."""
+	"""Action toolbar exposing game controls and solver choices."""
 
 	new_game_requested = Signal()
 	restart_requested = Signal()
 	undo_requested = Signal()
 	hint_requested = Signal()
-	solve_requested = Signal(str, str)
+	solve_requested = Signal(str)
 	auto_foundation_requested = Signal()
 	stop_solver_requested = Signal()
 
@@ -97,7 +97,7 @@ class ControlPanel(QWidget):
 			}
 		""")
 	def _build_ui(self):
-		"""Build buttons and nested solver menu, then wire signals."""
+		"""Build buttons and solver menu, then wire signals."""
 		layout = QGridLayout(self)
 		layout.setContentsMargins(10, 10, 10, 8)
 		layout.setHorizontalSpacing(8)
@@ -118,27 +118,9 @@ class ControlPanel(QWidget):
 		solver_button = QPushButton("Solver")
 		solver_menu = QMenu(solver_button)
 		for algo in SOLVER_ALGORITHMS:
-			if algo != "UCS":
-				action = QAction(algo, self)
-				action.triggered.connect(lambda checked, a=algo: self.solve_requested.emit(a, "speed"))
-				solver_menu.addAction(action)
-				continue
-
-			ucs_menu = QMenu("UCS", solver_menu)
-
-			ucs_first_action = QAction("First Solution", self)
-			ucs_first_action.triggered.connect(lambda checked: self.solve_requested.emit("UCS", "first"))
-			ucs_menu.addAction(ucs_first_action)
-
-			ucs_speed_action = QAction("Speed + Cost", self)
-			ucs_speed_action.triggered.connect(lambda checked: self.solve_requested.emit("UCS", "speed"))
-			ucs_menu.addAction(ucs_speed_action)
-
-			ucs_memory_action = QAction("Exact Memory", self)
-			ucs_memory_action.triggered.connect(lambda checked: self.solve_requested.emit("UCS", "memory"))
-			ucs_menu.addAction(ucs_memory_action)
-
-			solver_menu.addMenu(ucs_menu)
+			action = QAction(algo, self)
+			action.triggered.connect(lambda checked, a=algo: self.solve_requested.emit(a))
+			solver_menu.addAction(action)
 		solver_button.setMenu(solver_menu)
 		layout.addWidget(solver_button, 0, 3, Qt.AlignmentFlag.AlignHCenter)
 

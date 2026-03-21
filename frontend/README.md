@@ -205,7 +205,7 @@ Behavior highlights:
 
 Thread flow:
 
-1. `SolverThread.run()` creates `SearchAlgorithm(state, mode=ucs_mode)`.
+1. `SolverThread.run()` creates `SearchAlgorithm(state)`.
 2. Calls `search(algo)`.
 3. Emits either `result_ready(path)` or `error_occurred(message)`.
 
