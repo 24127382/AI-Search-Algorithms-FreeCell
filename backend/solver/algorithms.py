@@ -3,7 +3,7 @@
 from backend.solver.astar import AStarAlgorithm
 from backend.solver.bfs import BFSAlgorithm
 from backend.solver.dfs import DFSAlgorithm
-from backend.solver.heuristics import blocking_heuristic, combined_heuristic, foundation_distance, buried_cards, zero_heuristic
+from backend.solver.heuristics import combined_heuristic, foundation_distance, buried_cards, zero_heuristic
 from backend.solver.ucs.ucs import UCSAlgorithm
 
 class SearchAlgorithm:
