@@ -22,7 +22,7 @@ class SearchAlgorithm:
             "BFS": BFSAlgorithm(self.game_state).search,
             "DFS": DFSAlgorithm(self.game_state).search,
             "UCS": UCSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "A*": AStarAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
+            "A*": AStarAlgorithm(self.game_state,weight=5.0, should_cancel=self.should_cancel).search,
         }
 
     def search(self, algorithm, heuristic_func=combined_heuristic):

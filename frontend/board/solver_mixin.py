@@ -165,8 +165,6 @@ class BoardSolverMixin:
 				self.solve_timer.stop()
 			self.game_won.emit()
 			self._emit_status("You won!")
-		if hasattr(self, "solve_timer") and self.solve_timer:
-			self.solve_timer.stop()
 	
 	def restart(self):
 		"""Restore board to initial deal and clear transient runtime state."""

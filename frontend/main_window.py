@@ -1,16 +1,8 @@
 """Main application window and deal-number startup dialog."""
 
-import sys
-from pathlib import Path
-
-if __package__ is None or __package__ == "":
-	project_root = Path(__file__).resolve().parents[1]
-	if str(project_root) not in sys.path:
-		sys.path.insert(0, str(project_root))
-
 from frontend.board.widget import BoardWidget
 from frontend.control_panel import ControlPanel
-from frontend.shared.qt import QApplication, QDialog, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
+from frontend.shared.qt import QDialog, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
 
 
 class DealNumberDialog(QDialog):
@@ -186,19 +178,3 @@ class MainWindow(QMainWindow):
 	def _on_game_won(self):
 		"""Display a victory dialog when the board emits a win event."""
 		QMessageBox.information(self, "Victory", "You have completed the FreeCell game!")
-
-
-def main():
-	"""Run Qt application after user provides optional deal number.
-
-	Returns:
-		None: This function exits via `sys.exit`.
-	"""
-	app = QApplication(sys.argv)
-	deal_dialog = DealNumberDialog()
-	if deal_dialog.exec() != QDialog.DialogCode.Accepted:
-		sys.exit(0)
-
-	window = MainWindow(deal_number=deal_dialog.selected_deal_number)
-	window.show()
-	sys.exit(app.exec())

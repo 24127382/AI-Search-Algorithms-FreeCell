@@ -17,20 +17,8 @@ f(n)  — g(n) + weight * h(n).  The weight (default 3.0) amplifies h so it
 
 Memory management
 -----------------
-Three mechanisms are combined, each borrowed directly from UCS:
-
-1. Arena compaction (`compact_ucs_structures`): UCS costs are non-uniform so
-   the same state can be re-discovered via a cheaper g, producing a new arena
-   node while the old one becomes an orphan.  Compaction periodically walks
-   the parent-link tree from every live frontier node and discards unreachable
-   orphan entries, keeping arena size proportional to useful work done.
-
-2. Frontier truncation: when the frontier exceeds MAX_FRONTIER, keep only the
-   KEEP_FRONTIER best entries.  Ensures frontier memory is bounded even on
-   hard deals where the search spreads wide before finding a solution.
-
-3. Node cap: hard safety limit on total expansions.  Prevents OOM on the
-   small fraction of pathological deals.
+No hard node-cap is applied. The search runs until it finds a solution,
+is cancelled externally, or exhausts the frontier.
 
 Closed set
 ----------
@@ -42,7 +30,7 @@ never revisited.  This is the standard weighted A* contract.
 """
 
 import os
-from heapq import heapify, heappop, heappush, nsmallest
+from heapq import heappop, heappush
 from time import perf_counter
 from typing import Callable, List, Optional
 
@@ -58,31 +46,18 @@ from backend.solver.ucs.ucs_utils import (
 
 ASTAR_RUNTIME_LOG_ENABLED = os.environ.get("ASTAR_RUNTIME_LOG", "1") != "0"
 
-_LOG_INTERVAL = 2.0   # seconds between progress prints
-_DEFAULT_MAX_NODES = int(os.environ.get("ASTAR_MAX_NODES", "1000000"))
-_DEFAULT_MAX_FRONTIER = int(os.environ.get("ASTAR_MAX_FRONTIER", "250000"))
-_DEFAULT_KEEP_FRONTIER = int(os.environ.get("ASTAR_KEEP_FRONTIER", "175000"))
 
-
-def _make_profile(weight, max_nodes_override=None):
+def _make_profile(weight):
     """Derive A* runtime limits.
 
     Args:
         weight: Heuristic inflation factor.
-        max_nodes_override: Optional hard cap on expanded nodes.
 
     Returns:
         dict: A* configuration profile.
     """
-    max_frontier = max(1, _DEFAULT_MAX_FRONTIER)
-    keep_frontier = max(1, min(_DEFAULT_KEEP_FRONTIER, max_frontier))
     return {
         "WEIGHT":                    weight,
-        "MAX_NODES": max_nodes_override if max_nodes_override is not None
-                     else _DEFAULT_MAX_NODES,
-        "MAX_FRONTIER":              max_frontier,
-        "KEEP_FRONTIER":             keep_frontier,
-        "ENABLE_FRONTIER_TRUNCATION": True,
     }
 
 
@@ -104,13 +79,11 @@ class AStarAlgorithm:
         game_state,
         heuristic_func=None,
         weight: float = 5.0,
-        max_nodes: Optional[int] = None,   # None = use machine-adaptive default,
         should_cancel: Optional[Callable] = None,
     ):
         self.game_state     = game_state
         self.heuristic_func = heuristic_func or combined_heuristic
         self.weight         = weight
-        self.max_nodes      = max_nodes
         self.should_cancel = should_cancel or (lambda: False)
         self.last_run_stats = None
 
@@ -148,6 +121,7 @@ class AStarAlgorithm:
 
         lines = [
             "A* Run Stats",
+            f"- weight: {stats.get('weight', 0.0)}",
             f"- solution_found: {stats.get('solution_found', False)}",
             f"- elapsed_ms: {stats.get('elapsed_ms', 0.0):.2f}",
             f"- solution_length: {stats.get('solution_length', 0)}",
@@ -184,7 +158,7 @@ class AStarAlgorithm:
             list[Move] | None: Solution path, or None if unsolved within cap.
         """
 
-        profile = _make_profile(self.weight, self.max_nodes)
+        profile = _make_profile(self.weight)
         return self._search(heuristic_func or self.heuristic_func, profile)
 
     # ── Tie-breaking ──────────────────────────────────────────────────────────
@@ -242,42 +216,19 @@ class AStarAlgorithm:
         path.reverse()
         return path
 
-    # ── Logging ───────────────────────────────────────────────────────────────
-
-    def _log(self, started_at: float, stats: dict, frontier_size: int, g_cost_size: int) -> None:
-        """Print a one-line progress snapshot.
-
-        Args:
-            started_at:    Run start timestamp.
-            stats:         Current stats dict.
-            frontier_size: Current frontier entry count.
-            g_cost_size:   Current g_cost map size (unique states seen).
-        """
-        elapsed = perf_counter() - started_at
-        print(
-            f"[A*] w={self.weight}  "
-            f"t={elapsed:.1f}s  "
-            f"expanded={stats['expanded_nodes']}  "
-            f"frontier={frontier_size}  "
-            f"unique_seen={g_cost_size}  "
-            f"pruned_closed={stats['pruned_by_closed']}  "
-            f"pruned_cost={stats['pruned_by_cost']}"
-        )
-
     # ── Core search ───────────────────────────────────────────────────────────
 
     def _search(self, heuristic_func: Callable, profile: dict) -> Optional[List]:
         """Internal weighted A* loop.
 
-                Heap entry layout: (f, h, priority_bias, counter, g, state_id)
+            Heap entry layout: (f, h, priority_bias, counter, g, state_id)
           f             — g + w*h.  Primary sort key.
           h             — raw heuristic value.  Tie-breaks equal-f entries;
                           lower h preferred (state is closer to goal).
           priority_bias — structural quality tie-breaker.
           counter       — insertion order; avoids comparing State objects.
-                    g             — path cost used to detect stale heap entries.
-          state_id      — integer board id. Last position required by
-                                                    frontier truncation logic which uses node[-1].
+          g             — path cost used to detect stale heap entries.
+          state_id      — integer board id.
 
         Args:
             heuristic_func: Admissible h(state) -> int.
@@ -297,7 +248,6 @@ class AStarAlgorithm:
 
         # ── Frontier ─────────────────────────────────────────────────────────
         # Tuple: (f, h, bias, counter, g, state_id)
-        # state_id is LAST so truncation can use node[-1].
         frontier: list = []
         heappush(frontier, (f0, h0, self._priority_bias(start), counter, 0, start_id))
 
@@ -329,58 +279,18 @@ class AStarAlgorithm:
             "pruned_by_cost":     0,
             "pruned_by_closed":   0,
             "reopened_nodes":     0,
-            "frontier_truncations": 0,
             "peak_frontier_size": 1,
             "peak_g_cost_size":   1,
             "peak_closed_size":   0,
             "move_pool_size":     0,
             "solution_cost":      None,
             "solution_length":    0,
-            "node_cap_reached":   False,
         }
-
-        next_log_at = started_at + _LOG_INTERVAL
 
         # ── Main loop ─────────────────────────────────────────────────────────
         while frontier:
             if self.should_cancel():
                 return None
-
-
-            now = perf_counter()
-
-            # ── Periodic progress log ─────────────────────────────────────────
-            if now >= next_log_at:
-                self._log(started_at, stats, len(frontier), len(g_cost))
-                next_log_at = now + _LOG_INTERVAL
-
-            # ── Node cap ─────────────────────────────────────────────────────
-            if stats["expanded_nodes"] >= profile["MAX_NODES"]:
-                stats["node_cap_reached"]  = True
-                stats["move_pool_size"]    = len(move_pool)
-                stats["elapsed_seconds"]   = perf_counter() - started_at
-                stats["solution_found"]    = False
-                self.last_run_stats = stats
-                print(
-                    f"[A*] Node cap {profile['MAX_NODES']} reached.  "
-                    f"frontier={len(frontier)}  unique_seen={len(g_cost)}"
-                )
-                return None
-
-            # ── Frontier truncation ───────────────────────────────────────────
-            # Caps frontier memory.  Drops weakest (highest-f) entries.
-            # Mirrors UCS frontier truncation exactly, updated for 5-tuple.
-            if (
-                profile["ENABLE_FRONTIER_TRUNCATION"]
-                and len(frontier) >= profile["MAX_FRONTIER"]
-            ):
-                frontier = nsmallest(profile["KEEP_FRONTIER"], frontier)
-                heapify(frontier)
-                keep_ids = {node[-1] for node in frontier}
-                state_cache = {
-                    sid: s for sid, s in state_cache.items() if sid in keep_ids
-                }
-                stats["frontier_truncations"] += 1
 
             # ── Peak tracking ─────────────────────────────────────────────────
             if len(frontier) > stats["peak_frontier_size"]:
@@ -403,7 +313,6 @@ class AStarAlgorithm:
 
             current_state = state_cache.pop(current_id, None)
             if current_state is None:
-                # Evicted by frontier truncation before expansion.
                 stats["stale_heap_pops"] += 1
                 continue
 

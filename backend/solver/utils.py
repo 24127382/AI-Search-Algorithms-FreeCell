@@ -1,5 +1,5 @@
 import random
-from backend.model.models import VALID_RANK, VALID_SUITS, Card
+from backend.model.card import Card, VALID_SUITS, VALID_RANK
 
 def _generate_zobrist_table():
     """Generates a Zobrist hashing table with 16 position-specific hashes per card.
