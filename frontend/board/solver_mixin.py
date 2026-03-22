@@ -146,25 +146,32 @@ class BoardSolverMixin:
 
 	def _replay_next_solver_move(self):
 		"""Apply one solver move per timer tick until path is exhausted."""
-		if not hasattr(self, "solve_path") or not self.solve_path:
+		try:
+			if not hasattr(self, "solve_path") or not self.solve_path:
+				if hasattr(self, "solve_timer") and self.solve_timer:
+					self.solve_timer.stop()
+				self._emit_status("Auto-solve complete.")
+				return
+
+			move = self.solve_path.pop(0)
+			self.history.append(self.state)
+			self.state = apply_move(self.state, move)
+			self.move_count += 1
+
+			self.move_count_changed.emit(self.move_count)
+			self._render()
+
+			if self.state.is_goal:
+				if hasattr(self, "solve_timer") and self.solve_timer:
+					self.solve_timer.stop()
+				self.game_won.emit()
+				self._emit_status("You won!")
+		except Exception as e:
 			if hasattr(self, "solve_timer") and self.solve_timer:
 				self.solve_timer.stop()
-			self._emit_status("Auto-solve complete.")
-			return
-
-		move = self.solve_path.pop(0)
-		self.history.append(self.state)
-		self.state = apply_move(self.state, move)
-		self.move_count += 1
-
-		self.move_count_changed.emit(self.move_count)
-		self._render()
-
-		if self.state.is_goal:
-			if hasattr(self, "solve_timer") and self.solve_timer:
-				self.solve_timer.stop()
-			self.game_won.emit()
-			self._emit_status("You won!")
+			self._emit_status(f"Error replaying solution: {e}")
+			import traceback
+			traceback.print_exc()
 	
 	def restart(self):
 		"""Restore board to initial deal and clear transient runtime state."""
