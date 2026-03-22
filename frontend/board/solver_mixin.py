@@ -119,7 +119,13 @@ class BoardSolverMixin:
 		if run_id != self._active_solver_run_id:
 			return
 		self.is_solving = False
-		self.solver_running_changed.emit(False)
+		replay_running = bool(
+			hasattr(self, "solve_timer")
+			and self.solve_timer
+			and self.solve_timer.isActive()
+		)
+		if not replay_running:
+			self.solver_running_changed.emit(False)
 		self.solver_thread = None
 
 	def _on_solver_finished(self, algo, path, run_id: int):
@@ -133,8 +139,12 @@ class BoardSolverMixin:
 		if run_id != self._active_solver_run_id:
 			return
 		elapsed_ms = ((time.perf_counter() - self._solve_started_at) * 1000) if self._solve_started_at else 0.0
-		if not path:
+		if path is None:
 			self._emit_status(f"{algo} failed to find a solution after {elapsed_ms:.0f}ms.")
+			return
+
+		if path == []:
+			self._emit_status(f"{algo} reports already solved after {elapsed_ms:.0f}ms.")
 			return
 
 		self._emit_status(f"Found a solution in {len(path)} moves ({elapsed_ms:.0f}ms). Replaying...")
@@ -149,6 +159,8 @@ class BoardSolverMixin:
 		if not hasattr(self, "solve_path") or not self.solve_path:
 			if hasattr(self, "solve_timer") and self.solve_timer:
 				self.solve_timer.stop()
+				self.solve_timer = None
+			self.solver_running_changed.emit(False)
 			self._emit_status("Auto-solve complete.")
 			return
 
@@ -163,6 +175,8 @@ class BoardSolverMixin:
 		if self.state.is_goal:
 			if hasattr(self, "solve_timer") and self.solve_timer:
 				self.solve_timer.stop()
+				self.solve_timer = None
+			self.solver_running_changed.emit(False)
 			self.game_won.emit()
 			self._emit_status("You won!")
 	

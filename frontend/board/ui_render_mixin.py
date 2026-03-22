@@ -5,6 +5,7 @@ from backend.rule.rules import get_movable_sequences
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
 from frontend.card.assets import SUIT_SYMBOL
 from frontend.card.widget import CardWidget
+from frontend.shared.qt import QPoint
 from frontend.shared.animation import fade_in
 
 class BoardUiRenderMixin:
@@ -26,10 +27,6 @@ class BoardUiRenderMixin:
 		from frontend.shared.animation import animate_move
 		cw = self._card_registry.get(card)
 		if isinstance(new_pos, tuple):
-			try:
-				from PySide6.QtCore import QPoint
-			except ImportError:
-				from PyQt6.QtCore import QPoint
 			new_pos = QPoint(int(new_pos[0]), int(new_pos[1]))
 		if cw is None:
 			cw = CardWidget(card, pos_tuple, new_parent)
@@ -95,7 +92,7 @@ class BoardUiRenderMixin:
 
 			if card:
 				bg = "#f8f9fa"
-				color = "#c0392b" if card.suit in ("hearts", "diamonds") else "#f7f8fa"
+				color = "#c0392b" if card.suit in ("hearts", "diamonds") else "#1f2d3d"
 				border = "4px solid #ffeb3b" if selected else "1px solid #2c3e50"
 				self._update_card_widget(card, button, (0, 0), (SLOT_FREECELL, idx), f"freecell:{idx}", True, [], selected)
 			else:
