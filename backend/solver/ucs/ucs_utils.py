@@ -118,7 +118,7 @@ def ucs_move_cost(move, prev_state=None, next_state=None):
 		int: Edge cost used by UCS.
 	"""
 	if move.to_pos[0] == "foundation":
-		return -20
+		return 1
 
 	cost = 10
 	good_tableau_build = is_good_tableau_build(move, prev_state)
