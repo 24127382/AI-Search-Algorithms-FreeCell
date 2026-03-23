@@ -28,6 +28,9 @@ class BoardMoveInteractionMixin:
 		Args:
 			pos: Clicked card position tuple.
 		"""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if self.state is None:
 			return
 
@@ -89,6 +92,9 @@ class BoardMoveInteractionMixin:
 		Args:
 			pos: Double-clicked position tuple.
 		"""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if self.state is None:
 			return
 
@@ -134,6 +140,9 @@ class BoardMoveInteractionMixin:
 		Args:
 			col_idx: Target tableau column index.
 		"""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if self.selected_source is None:
 			card = self.state.tableau[col_idx][-1] if self.state.tableau[col_idx] else None
 			if card is None:
@@ -151,6 +160,9 @@ class BoardMoveInteractionMixin:
 		Args:
 			cell_idx: Freecell index.
 		"""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if self.selected_source is None:
 			card = self.state.freecells[cell_idx]
 			if card is None:
@@ -168,6 +180,9 @@ class BoardMoveInteractionMixin:
 		Args:
 			foundation_idx: Foundation index.
 		"""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if self.selected_source is None:
 			self._emit_status("Select a source card before moving to Foundation.")
 			return

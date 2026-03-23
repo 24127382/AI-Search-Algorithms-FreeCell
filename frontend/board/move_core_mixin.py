@@ -17,6 +17,9 @@ class BoardMoveCoreMixin:
 			from_pos: Source position tuple.
 			to_pos: Destination position tuple.
 		"""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		self._apply_drop_move(from_pos, to_pos)
 
 	def _apply_drop_move(self, from_pos: tuple[str, int], to_pos: tuple[str, int]):
@@ -27,6 +30,9 @@ class BoardMoveCoreMixin:
 			to_pos: Destination position tuple.
 		"""
 		if self.state is None:
+			return
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
 			return
 
 		self.selected_source = from_pos
@@ -48,6 +54,10 @@ class BoardMoveCoreMixin:
 			to_pos: Destination position tuple.
 		"""
 		if self.state is None or self.selected_source is None:
+			return
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			self._set_source(None)
 			return
 
 		from_pos_engine = (self.selected_source[0], self.selected_source[1])
@@ -76,8 +86,9 @@ class BoardMoveCoreMixin:
 		)
 
 		if self.state.is_goal:
+			self._capture_pre_win_snapshot()
 			self._emit_status("Congratulations! You won FreeCell.")
-			self.game_won.emit()
+			self._emit_game_won_once()
 
 	def _expected_card_from_selected_source(self) -> Card | None:
 		"""Resolve expected base card for current selected source.
@@ -189,5 +200,6 @@ class BoardMoveCoreMixin:
 		self._render()
 
 		if check_goal and self.state.is_goal:
+			self._capture_pre_win_snapshot()
 			self._emit_status("Congratulations! You won FreeCell.")
-			self.game_won.emit()
+			self._emit_game_won_once()
