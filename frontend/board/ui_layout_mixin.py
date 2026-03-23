@@ -2,7 +2,7 @@
 
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
 from frontend.board.slot_widgets import SlotButton, TableauColumnWidget
-from frontend.shared.qt import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, Qt
+from frontend.shared.qt import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget, Qt
 
 class BoardUiLayoutMixin:
 	"""Build and wire static board layout widgets."""
@@ -33,9 +33,16 @@ class BoardUiLayoutMixin:
 				color: white;
 				font-weight: bold;
 			}
+			QPushButton#SolverReviewControlButton {
+				border: 3px solid rgba(255, 255, 255, 0.95);
+				border-radius: 8px;
+			}
 			QPushButton:hover {
 				background-color: rgba(255, 255, 255, 0.14);
 				border-color: white;
+			}
+			QPushButton#SolverReviewControlButton:hover {
+				border-color: #ffffff;
 			}
 		""")
 
@@ -76,6 +83,38 @@ class BoardUiLayoutMixin:
 		self._deal_number_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 		bottom_row.addWidget(self._deal_number_label, alignment=Qt.AlignmentFlag.AlignLeft)
 		bottom_row.addStretch(1)
+
+		self._solver_review_controls = QWidget(self)
+		review_controls_layout = QHBoxLayout(self._solver_review_controls)
+		review_controls_layout.setContentsMargins(0, 0, 0, 0)
+		review_controls_layout.setSpacing(8)
+
+		self._list_moves_button = QPushButton("List of move")
+		self._list_moves_button.setObjectName("SolverReviewControlButton")
+		self._list_moves_button.setFixedWidth(80)
+		self._list_moves_button.clicked.connect(self._on_solver_list_moves_clicked)
+		review_controls_layout.addWidget(self._list_moves_button)
+
+		self._solver_prev_button = QPushButton("⏮")
+		self._solver_prev_button.setObjectName("SolverReviewControlButton")
+		self._solver_prev_button.setFixedWidth(30)
+		self._solver_prev_button.clicked.connect(self._on_solver_prev_clicked)
+		review_controls_layout.addWidget(self._solver_prev_button)
+
+		self._solver_play_pause_button = QPushButton("▶")
+		self._solver_play_pause_button.setObjectName("SolverReviewControlButton")
+		self._solver_play_pause_button.setFixedWidth(30)
+		self._solver_play_pause_button.clicked.connect(self._on_solver_play_pause_clicked)
+		review_controls_layout.addWidget(self._solver_play_pause_button)
+
+		self._solver_next_button = QPushButton("⏭")
+		self._solver_next_button.setObjectName("SolverReviewControlButton")
+		self._solver_next_button.setFixedWidth(30)
+		self._solver_next_button.clicked.connect(self._on_solver_next_clicked)
+		review_controls_layout.addWidget(self._solver_next_button)
+
+		self._solver_review_controls.setVisible(False)
+		bottom_row.addWidget(self._solver_review_controls, alignment=Qt.AlignmentFlag.AlignRight)
 		return bottom_row
 
 	def _build_top_row(self) -> QHBoxLayout:

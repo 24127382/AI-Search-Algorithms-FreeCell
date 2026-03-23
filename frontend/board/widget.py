@@ -48,6 +48,23 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self._active_solver_run_id = 0
 		self.solve_timer = None
 		self.solve_path = []
+		self._solve_review_mode = False
+		self._solve_is_playing = False
+		self._solve_moves = []
+		self._solve_states = []
+		self._solve_current_index = 0
+		self._solve_initial_state = None
+		self._solve_base_move_count = 0
+		self._solve_move_list_dialog = None
+		self._solve_move_list_scroll = None
+		self._solve_move_buttons = []
+		self._solver_review_controls = None
+		self._list_moves_button = None
+		self._solver_prev_button = None
+		self._solver_play_pause_button = None
+		self._solver_next_button = None
+		self._pre_win_snapshot = None
+		self._last_announced_win_board_code = None
 
 		self._freecell_buttons = []
 		self._foundation_buttons = []
@@ -84,6 +101,8 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	def new_game(self):
 		"""Reset game/session counters and render a new deal."""
 		solver_stopped = self._stop_solver_execution()
+		self._pre_win_snapshot = None
+		self._last_announced_win_board_code = None
 		self.initial_state = self._build_initial_state()
 		self.state = deepcopy(self.initial_state)
 		self.history.clear()
@@ -94,3 +113,70 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 			self._emit_status(f"Solver stopped. New game started - Deal #{self.current_deal_number}.")
 			return
 		self._emit_status(f"New game started - Deal #{self.current_deal_number}.")
+
+	def _capture_pre_win_snapshot(
+		self,
+		prev_state: State | None = None,
+		prev_move_count: int | None = None,
+		prev_history: list[State] | None = None,
+	):
+		"""Capture restorable board snapshot from immediately before a winning state.
+
+		Args:
+			prev_state: Explicit previous state to restore.
+			prev_move_count: Explicit move count tied to previous state.
+			prev_history: Explicit history stack tied to previous state.
+		"""
+		if prev_state is None:
+			if self.history:
+				prev_state = self.history[-1]
+				prev_history = list(self.history[:-1]) if prev_history is None else prev_history
+				prev_move_count = max(0, self.move_count - 1) if prev_move_count is None else prev_move_count
+			elif self.initial_state is not None:
+				prev_state = self.initial_state
+				prev_history = [] if prev_history is None else prev_history
+				prev_move_count = 0 if prev_move_count is None else prev_move_count
+
+		if prev_state is None:
+			return
+
+		if prev_history is None:
+			prev_history = list(self.history)
+		if prev_move_count is None:
+			prev_move_count = max(0, self.move_count - 1)
+
+		self._pre_win_snapshot = {
+			"state": prev_state,
+			"history": list(prev_history),
+			"move_count": max(0, prev_move_count),
+			"selected_source": None,
+		}
+
+	def restore_previous_game_state(self) -> bool:
+		"""Restore the board snapshot captured before the latest win.
+
+		Returns:
+			bool: `True` if a previous snapshot was restored.
+		"""
+		snapshot = self._pre_win_snapshot
+		if snapshot is None:
+			return False
+
+		self.state = snapshot["state"]
+		self.history = list(snapshot["history"])
+		self.move_count = snapshot["move_count"]
+		self.selected_source = snapshot["selected_source"]
+		self._last_announced_win_board_code = None
+		self._render()
+		self._emit_status("Returned to the previous game state before win.")
+		return True
+
+	def _emit_game_won_once(self):
+		"""Emit game-won signal once per unique goal board state."""
+		if self.state is None:
+			return
+		board_code = self.state.board_code
+		if self._last_announced_win_board_code == board_code:
+			return
+		self._last_announced_win_board_code = board_code
+		self.game_won.emit()
