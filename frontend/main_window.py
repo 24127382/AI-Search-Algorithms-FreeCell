@@ -99,6 +99,74 @@ class DealNumberDialog(QDialog):
 		self.accept()
 
 
+class VictoryDialog(QDialog):
+	"""Dialog shown after winning with quick next actions."""
+
+	def __init__(self, parent=None):
+		super().__init__(parent)
+		self.selected_action: str | None = None
+		self.setWindowTitle("Victory")
+		self.setModal(True)
+		self.resize(460, 210)
+		self.setStyleSheet("""
+			QDialog {
+				background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #153824, stop:1 #0d2517);
+			}
+			QLabel {
+				color: #eff9f1;
+			}
+			QPushButton {
+				background-color: #1f8f52;
+				color: white;
+				border: 1px solid #15663a;
+				border-radius: 8px;
+				padding: 8px 14px;
+				font-weight: bold;
+				font-size: 11pt;
+			}
+			QPushButton:hover {
+				background-color: #27a85f;
+			}
+			QPushButton:pressed {
+				background-color: #187843;
+			}
+		""")
+		self._build_ui()
+
+	def _build_ui(self):
+		layout = QVBoxLayout(self)
+		layout.setContentsMargins(18, 16, 18, 16)
+		layout.setSpacing(12)
+
+		title = QLabel("Congratulations! You won FreeCell.")
+		title.setStyleSheet("font-size: 13pt; font-weight: bold;")
+		layout.addWidget(title)
+
+		subtitle = QLabel("Choose your next action:")
+		subtitle.setStyleSheet("font-size: 10.5pt;")
+		layout.addWidget(subtitle)
+
+		button_row = QHBoxLayout()
+		button_row.setSpacing(8)
+
+		new_game_button = QPushButton("New Game")
+		new_game_button.clicked.connect(self._choose_new_game)
+		back_button = QPushButton("Back to previous game")
+		back_button.clicked.connect(self._choose_back)
+
+		button_row.addWidget(new_game_button)
+		button_row.addWidget(back_button)
+		layout.addLayout(button_row)
+
+	def _choose_new_game(self):
+		self.selected_action = "new_game"
+		self.accept()
+
+	def _choose_back(self):
+		self.selected_action = "back_previous"
+		self.accept()
+
+
 class MainWindow(QMainWindow):
 	"""Top-level container that hosts controls and the game board."""
 
@@ -176,5 +244,15 @@ class MainWindow(QMainWindow):
 			QMessageBox.warning(self, "Cannot Start Deal", str(exc))
 
 	def _on_game_won(self):
-		"""Display a victory dialog when the board emits a win event."""
-		QMessageBox.information(self, "Victory", "You have completed the FreeCell game!")
+		"""Display a victory dialog with follow-up actions after winning."""
+		dialog = VictoryDialog(self)
+		if dialog.exec() != QDialog.DialogCode.Accepted:
+			return
+
+		if dialog.selected_action == "new_game":
+			self._on_new_game_requested()
+			return
+
+		if dialog.selected_action == "back_previous":
+			if not self.board.restore_previous_game_state():
+				QMessageBox.information(self, "No Previous Game", "No previous game state is available to restore.")
