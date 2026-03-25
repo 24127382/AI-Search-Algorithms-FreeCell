@@ -1,15 +1,12 @@
 """Shared short sound-effects manager for UI interactions."""
 
 from pathlib import Path
-from time import monotonic
 
 from frontend.shared.qt import QAudioOutput, QMediaPlayer, QUrl
 
 _CARD_DROP_VOLUME = 1.0
-_CARD_DROP_PLAYBACK_RATE = 0.86
-_CARD_DROP_POOL_SIZE = 4
-_CARD_DROP_COOLDOWN_SECONDS = 0.06
-_INVALID_MOVE_VOLUME = 0.5
+_CARD_DROP_POOL_SIZE = 3
+_INVALID_MOVE_VOLUME = 0.3
 _WIN_SOUND_VOLUME = 0.7
 
 
@@ -29,7 +26,6 @@ class _SoundManager:
         self._card_drop_players: list[QMediaPlayer] = []
         self._card_drop_outputs: list[QAudioOutput] = []
         self._card_drop_pool_index = 0
-        self._last_card_drop_ts = 0.0
 
     @staticmethod
     def _create_player(sound_path: Path, volume: float, playback_rate: float = 1.0) -> tuple[QMediaPlayer, QAudioOutput]:
@@ -66,11 +62,7 @@ class _SoundManager:
             return False
 
         for _ in range(_CARD_DROP_POOL_SIZE):
-            player, output = self._create_player(
-                sound_path,
-                _CARD_DROP_VOLUME,
-                playback_rate=_CARD_DROP_PLAYBACK_RATE,
-            )
+            player, output = self._create_player(sound_path, _CARD_DROP_VOLUME)
             self._card_drop_players.append(player)
             self._card_drop_outputs.append(output)
         return True
@@ -82,17 +74,11 @@ class _SoundManager:
         player.play()
 
     def play_card_drop(self):
-        now = monotonic()
-        if now - self._last_card_drop_ts < _CARD_DROP_COOLDOWN_SECONDS:
-            return
-
         if not self._ensure_card_drop_pool():
             return
 
         player = self._card_drop_players[self._card_drop_pool_index]
         self._card_drop_pool_index = (self._card_drop_pool_index + 1) % len(self._card_drop_players)
-
-        self._last_card_drop_ts = now
         self._play(player)
 
     def play_invalid_move(self):

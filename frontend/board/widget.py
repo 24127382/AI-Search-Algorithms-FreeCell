@@ -75,8 +75,6 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self._deal_number_label = None
 		self._play_deal_shuffle_on_next_render = False
 		self._is_deal_shuffle_setup = False
-		self._deal_shuffle_timer = None
-		self._deal_shuffle_queue = []
 		self._deal_shuffle_active = False
 
 		self._build_ui()

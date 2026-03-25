@@ -1,35 +1,22 @@
 """Board rendering mixin that maps state objects to Qt widgets."""
 
+from backend.engine.shuffle import deal_by_game_number, random_deal_number
 from backend.model.card import VALID_SUITS
 from backend.rule.rules import get_movable_sequences
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
 from frontend.card.assets import SUIT_SYMBOL
 from frontend.card.widget import CardWidget
-from frontend.shared.qt import QPoint, QTimer
+from frontend.shared.qt import QPoint
 from frontend.shared.animation import animate_move, fade_in
 from frontend.shared.sound import play_card_drop_sound
 
-_DEAL_ANIMATION_INTERVAL_MS = 100
-_DEAL_ANIMATION_DURATION_MS = 100
-_DEAL_JITTER_X_STEP = 5
-_DEAL_JITTER_Y_STEP = 3
+_DEAL_ANIMATION_DURATION_MS = 120
 
 class BoardUiRenderMixin:
 	"""Render freecells, foundations, tableau, and card widget transitions."""
 
 	def _cancel_deal_shuffle_animation(self):
 		"""Stop pending deal-shuffle timers to avoid stale animations."""
-		shuffle_timer = getattr(self, "_deal_shuffle_timer", None)
-		if shuffle_timer is not None:
-			shuffle_timer.stop()
-		for widget, _start_pos, target_pos in getattr(self, "_deal_shuffle_queue", []):
-			try:
-				widget.move(target_pos)
-				widget._deal_hidden = False
-				widget.show()
-			except RuntimeError:
-				pass
-		self._deal_shuffle_queue = []
 		self._deal_shuffle_active = False
 
 	def _update_card_widget(self, card, new_parent, new_pos, pos_tuple, payload_str, is_draggable, drag_sequence, is_selected):
@@ -108,7 +95,7 @@ class BoardUiRenderMixin:
 		self.move_count_changed.emit(self.move_count)
 
 	def _play_deal_shuffle_animation_if_needed(self):
-		"""Run one-shot shuffle intro animation when a new table is initialized."""
+		"""Run one-shot deal animation when a new table is initialized."""
 		if not getattr(self, "_play_deal_shuffle_on_next_render", False):
 			return
 		self._cancel_deal_shuffle_animation()
@@ -117,67 +104,66 @@ class BoardUiRenderMixin:
 		if self.state is None or not self._card_registry:
 			return
 
-		deck_anchor_global = self.mapToGlobal(QPoint(max(12, self.width() // 2 - 36), 12))
-		ordered_widgets = []
-		max_height = max((len(col_cards) for col_cards in self.state.tableau), default=0)
-		for layer in range(max_height):
-			for col_cards in self.state.tableau:
-				if layer >= len(col_cards):
-					continue
-				card = col_cards[layer]
-				widget = self._card_registry.get(card)
-				if widget is not None and widget.parentWidget() is not None:
-					ordered_widgets.append(widget)
-
-		deal_steps = []
-		for index, widget in enumerate(ordered_widgets):
-			parent = widget.parentWidget()
-			target_pos = QPoint(widget.pos())
-			start_pos = parent.mapFromGlobal(deck_anchor_global)
-			start_pos.setX(start_pos.x() + ((index % 7) - 3) * _DEAL_JITTER_X_STEP)
-			start_pos.setY(start_pos.y() + ((index % 5) - 2) * _DEAL_JITTER_Y_STEP)
-			widget.move(start_pos)
-			widget._deal_hidden = True
-			widget.hide()
-			deal_steps.append((widget, QPoint(start_pos), QPoint(target_pos)))
-
-		self._deal_shuffle_queue = deal_steps
-		if not self._deal_shuffle_queue:
+		all_widgets = [widget for widget in self._card_registry.values() if widget.parentWidget() is not None]
+		if not all_widgets:
 			self._deal_shuffle_active = False
 			return
+
+		random_tableau = deal_by_game_number(random_deal_number())
+		random_start_positions = self._build_random_deal_positions(random_tableau)
+
 		self._deal_shuffle_active = True
+		play_card_drop_sound()
 
-		if self._deal_shuffle_timer is None:
-			self._deal_shuffle_timer = QTimer(self)
-			self._deal_shuffle_timer.timeout.connect(
-				self._advance_deal_shuffle
-			)
-
-		self._deal_shuffle_timer.start(_DEAL_ANIMATION_INTERVAL_MS)
-		self._advance_deal_shuffle()
-
-	def _run_deal_shuffle_step(self, widget, start_pos, target_pos):
-		"""Play sound and animate one dealt card step."""
-		try:
+		for widget in all_widgets:
+			parent_widget = widget.parentWidget()
+			target_pos = QPoint(widget.pos())
+			start_global = random_start_positions.get(widget.card)
+			if start_global is None:
+				continue
+			start_pos = parent_widget.mapFromGlobal(start_global)
 			widget.move(start_pos)
-			widget._deal_hidden = False
 			widget.show()
 			widget.raise_()
-			play_card_drop_sound()
 			animate_move(widget, start_pos, target_pos, duration=_DEAL_ANIMATION_DURATION_MS, play_sound=False)
-		except RuntimeError:
+
+		self._enforce_card_layering()
+
+		self._deal_shuffle_active = False
+
+	def _enforce_card_layering(self):
+		"""Restore deterministic z-order so card stacks render in correct layers."""
+		if self.state is None:
 			return
 
-	def _advance_deal_shuffle(self):
-		"""Advance one step in queued deal-shuffle animation."""
-		if not self._deal_shuffle_queue:
-			if self._deal_shuffle_timer is not None:
-				self._deal_shuffle_timer.stop()
-			self._deal_shuffle_active = False
-			return
+		for card in self.state.freecells:
+			if card is None:
+				continue
+			widget = self._card_registry.get(card)
+			if widget is not None:
+				widget.raise_()
 
-		widget, start_pos, target_pos = self._deal_shuffle_queue.pop(0)
-		self._run_deal_shuffle_step(widget, start_pos, target_pos)
+		for foundation_cards in self.state.foundations:
+			for card in foundation_cards:
+				widget = self._card_registry.get(card)
+				if widget is not None:
+					widget.raise_()
+
+		for col_cards in self.state.tableau:
+			for card in col_cards:
+				widget = self._card_registry.get(card)
+				if widget is not None:
+					widget.raise_()
+
+	def _build_random_deal_positions(self, random_tableau) -> dict:
+		"""Build global card positions from a random deal layout."""
+		positions = {}
+		for col_idx, col_cards in enumerate(random_tableau):
+			column_widget = self._tableau_layouts[col_idx]
+			for row_idx, card in enumerate(col_cards):
+				local_pos = QPoint(0, row_idx * 30)
+				positions[card] = column_widget.mapToGlobal(local_pos)
+		return positions
 
 	def _emit_status(self, message: str):
 		"""Forward status text through widget-level status signal.
