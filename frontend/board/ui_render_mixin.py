@@ -103,7 +103,7 @@ class BoardUiRenderMixin:
 
 			button.set_drag_payload(f"freecell:{idx}", card is not None)
 			button.setStyleSheet(
-				f"text-align: center; border: {border}; background-color: {bg}; color: {color}; font-size: 14pt; border-radius: 8px;"
+				f"text-align: center; margin: 0px 7px; border: {border}; background-color: {bg}; color: {color}; font-size: 14pt; border-radius: 8px;"
 			)
 
 	def _render_foundations(self):
@@ -131,7 +131,7 @@ class BoardUiRenderMixin:
 				font_size = "32px"
 
 			button.setStyleSheet(
-				f"text-align: center; border: {border}; background-color: {bg}; color: {color}; font-size: {font_size}; border-radius: 8px;"
+				f"text-align: center; margin: 0px 7px; border: {border}; background-color: {bg}; color: {color}; font-size: {font_size}; border-radius: 8px;"
 			)
 
 	def _render_tableau(self):
@@ -159,7 +159,7 @@ class BoardUiRenderMixin:
 			col_selected = self.selected_source == (SLOT_TABLEAU, col_idx)
 			border = "3px solid #ffeb3b" if col_selected else "4px solid #ffffff"
 			self._tableau_buttons[col_idx].set_drag_payload(f"tableau:{col_idx}", bool(col_cards))
-			self._tableau_buttons[col_idx].setStyleSheet(f"border: {border};")
+			self._tableau_buttons[col_idx].setStyleSheet(f"margin: 0px 7px; border: {border};")
 
 	def _is_selected_tableau_card(self, col_idx: int, card_idx: int, is_draggable: bool, is_top: bool) -> bool:
 		"""Check whether tableau card should show selected highlight.

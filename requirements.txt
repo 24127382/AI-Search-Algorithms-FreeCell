@@ -1,5 +1,4 @@
-# GUI(PyQt6 hoặc PySide6)
-pyqt6>=6.10.2
+# GUI(PySide6)
 pyside6>=6.10.2
 
 # Phân tích dữ liệu và vẽ biểu đồ cho phần Experiments

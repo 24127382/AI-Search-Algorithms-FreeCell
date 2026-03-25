@@ -180,7 +180,7 @@ class MainWindow(QMainWindow):
 		self.selected_deal_number: int | None = deal_number
 		self.current_deal_number: int | None = None
 		self.setWindowTitle(f"FreeCell - {QT_API}")
-		self.resize(1000, 750)
+		self.resize(900, 700)
 
 		self.board = BoardWidget(deal_number=deal_number)
 		self.controls = ControlPanel()

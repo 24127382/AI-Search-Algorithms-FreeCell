@@ -14,9 +14,8 @@ class BoardUiLayoutMixin:
 		root_layout.setContentsMargins(14, 12, 14, 12)
 		root_layout.setSpacing(9)
 
-		root_layout.addWidget(self._create_section_title("FreeCells / Foundations", align_center=False))
 		root_layout.addLayout(self._build_top_row())
-		root_layout.addWidget(self._create_section_title("Tableau", align_center=True))
+		root_layout.addSpacing(24)
 		root_layout.addWidget(self._build_tableau_container(), 1)
 		root_layout.addLayout(self._build_bottom_info_row())
 
@@ -168,10 +167,6 @@ class BoardUiLayoutMixin:
 		for col_idx in range(8):
 			col_widget = self._create_tableau_column_widget(col_idx)
 			tableau_row.addWidget(col_widget)
-			if col_idx == 3:
-				bottom_spacer = QLabel(" ")
-				bottom_spacer.setFixedWidth(24)
-				tableau_row.addWidget(bottom_spacer)
 
 		tableau_row.addStretch()
 		return tableau_container

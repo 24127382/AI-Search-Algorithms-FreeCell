@@ -36,19 +36,24 @@ def paint_card_overlay(painter, width: int, height: int, selected: bool, hovered
 		hovered: Whether pointer is hovering card.
 		drag_enabled: Whether card is draggable.
 	"""
+	overlay_inset_x = 7
+	overlay_inset_y = 0
+	overlay_w = max(1, width - 1 - (overlay_inset_x * 2))
+	overlay_h = max(1, height - 1 - (overlay_inset_y * 2))
+
 	painter.setPen(QPen(QColor(255, 255, 255, 55), 1))
 	painter.setBrush(Qt.BrushStyle.NoBrush)
-	painter.drawRoundedRect(0, 0, width - 1, height - 1, 8, 8)
+	painter.drawRoundedRect(overlay_inset_x, overlay_inset_y, overlay_w, overlay_h, 8, 8)
 
 	shadow_path = QPainterPath()
-	shadow_path.addRoundedRect(1.5, height - 12.0, width - 3.0, 10.0, 5.0, 5.0)
+	shadow_path.addRoundedRect(overlay_inset_x + 1.5, height - 12.0, max(1.0, width - 3.0 - (overlay_inset_x * 2)), 10.0, 5.0, 5.0)
 	painter.fillPath(shadow_path, QColor(0, 0, 0, 36))
 
 	if selected:
 		painter.setPen(QPen(QColor("#ffe366"), 3))
 		painter.setBrush(Qt.BrushStyle.NoBrush)
-		painter.drawRoundedRect(1, 1, width - 2, height - 2, 8, 8)
+		painter.drawRoundedRect(overlay_inset_x + 1, overlay_inset_y + 1, max(1, overlay_w - 1), max(1, overlay_h - 1), 8, 8)
 	elif hovered and drag_enabled:
 		painter.setPen(QPen(QColor("#4eb9ff"), 2))
 		painter.setBrush(Qt.BrushStyle.NoBrush)
-		painter.drawRoundedRect(1, 1, width - 2, height - 2, 8, 8)
+		painter.drawRoundedRect(overlay_inset_x + 1, overlay_inset_y + 1, max(1, overlay_w - 1), max(1, overlay_h - 1), 8, 8)
