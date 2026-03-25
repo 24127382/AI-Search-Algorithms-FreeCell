@@ -11,6 +11,7 @@ class MoveType(str, Enum):
     TABLEAU_TO_TABLEAU = "tableau_to_tableau"
     TABLEAU_TO_FREECELL = "tableau_to_freecell"
     TABLEAU_TO_FOUNDATION = "tableau_to_foundation"
+    FREECELL_TO_FREECELL = "freecell_to_freecell"
     FREECELL_TO_TABLEAU = "freecell_to_tableau"
     FREECELL_TO_FOUNDATION = "freecell_to_foundation"
 

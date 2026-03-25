@@ -229,17 +229,24 @@ def find_valid_destinations(
                 )
                 valid_destinations.append(move)
 
-    if len(sequence) == 1 and from_pos[0] == 'tableau':
+    if len(sequence) == 1 and from_pos[0] in ('tableau', 'freecell'):
         for c_idx, cell in enumerate(state.freecells):
-            if cell is None:
-                move = Move(
-                    MoveType.TABLEAU_TO_FREECELL,
-                    base_card,
-                    from_pos,
-                    ('freecell', c_idx),
-                    sequence=tuple(sequence),
-                )
-                valid_destinations.append(move)
+            if cell is not None:
+                continue
+
+            move_type = (
+                MoveType.TABLEAU_TO_FREECELL
+                if from_pos[0] == 'tableau'
+                else MoveType.FREECELL_TO_FREECELL
+            )
+            move = Move(
+                move_type,
+                base_card,
+                from_pos,
+                ('freecell', c_idx),
+                sequence=tuple(sequence),
+            )
+            valid_destinations.append(move)
 
     return valid_destinations
 
