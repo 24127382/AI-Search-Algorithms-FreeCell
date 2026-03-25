@@ -5,6 +5,7 @@ from backend.model.card import Card
 from backend.rule.rules import get_max_sequence_length, get_movable_sequences
 from frontend.board.constants import SLOT_TABLEAU
 from frontend.card.assets import SUIT_SYMBOL
+from frontend.shared.sound import play_invalid_move_sound
 
 
 class BoardMoveCoreMixin:
@@ -70,8 +71,10 @@ class BoardMoveCoreMixin:
 
 		if candidate_move is None:
 			if self._emit_sequence_limit_violation(to_pos, expected_card):
+				play_invalid_move_sound()
 				self._set_source(None)
 				return
+			play_invalid_move_sound()
 			self._emit_status("Invalid move.")
 			self._set_source(None)
 			return

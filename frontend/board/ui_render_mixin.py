@@ -5,11 +5,32 @@ from backend.rule.rules import get_movable_sequences
 from frontend.board.constants import SLOT_FOUNDATION, SLOT_FREECELL, SLOT_TABLEAU
 from frontend.card.assets import SUIT_SYMBOL
 from frontend.card.widget import CardWidget
-from frontend.shared.qt import QPoint
-from frontend.shared.animation import fade_in
+from frontend.shared.qt import QPoint, QTimer
+from frontend.shared.animation import animate_move, fade_in
+from frontend.shared.sound import play_card_drop_sound
+
+_DEAL_ANIMATION_INTERVAL_MS = 100
+_DEAL_ANIMATION_DURATION_MS = 100
+_DEAL_JITTER_X_STEP = 5
+_DEAL_JITTER_Y_STEP = 3
 
 class BoardUiRenderMixin:
 	"""Render freecells, foundations, tableau, and card widget transitions."""
+
+	def _cancel_deal_shuffle_animation(self):
+		"""Stop pending deal-shuffle timers to avoid stale animations."""
+		shuffle_timer = getattr(self, "_deal_shuffle_timer", None)
+		if shuffle_timer is not None:
+			shuffle_timer.stop()
+		for widget, _start_pos, target_pos in getattr(self, "_deal_shuffle_queue", []):
+			try:
+				widget.move(target_pos)
+				widget._deal_hidden = False
+				widget.show()
+			except RuntimeError:
+				pass
+		self._deal_shuffle_queue = []
+		self._deal_shuffle_active = False
 
 	def _update_card_widget(self, card, new_parent, new_pos, pos_tuple, payload_str, is_draggable, drag_sequence, is_selected):
 		"""Create/reparent/move one `CardWidget` and update interaction state.
@@ -24,58 +45,139 @@ class BoardUiRenderMixin:
 			drag_sequence: Sequence used for stacked drag preview.
 			is_selected: Whether card should render selected highlight.
 		"""
-		from frontend.shared.animation import animate_move
-		cw = self._card_registry.get(card)
+		card_widget = self._card_registry.get(card)
 		if isinstance(new_pos, tuple):
 			new_pos = QPoint(int(new_pos[0]), int(new_pos[1]))
-		if cw is None:
-			cw = CardWidget(card, pos_tuple, new_parent)
-			cw.clicked.connect(self._on_card_clicked_dispatcher)
-			cw.double_clicked.connect(self._on_card_double_clicked)
-			cw.drop_received.connect(self._on_drop_received)
-			self._card_registry[card] = cw
-			cw.move(new_pos)
-			cw.show()
-			fade_in(cw, duration=120)
+		if card_widget is None:
+			card_widget = CardWidget(card, pos_tuple, new_parent)
+			card_widget.clicked.connect(self._on_card_clicked_dispatcher)
+			card_widget.double_clicked.connect(self._on_card_double_clicked)
+			card_widget.drop_received.connect(self._on_drop_received)
+			self._card_registry[card] = card_widget
+			card_widget.move(new_pos)
+			card_widget.show()
+			fade_in(card_widget, duration=150)
 		else:
-			cw.position = pos_tuple
-			old_parent = cw.parent()
+			card_widget.position = pos_tuple
+			old_parent = card_widget.parent()
 			if old_parent != new_parent and old_parent is not None:
-				old_global = old_parent.mapToGlobal(cw.pos())
-				cw.setParent(new_parent)
+				old_global = old_parent.mapToGlobal(card_widget.pos())
+				card_widget.setParent(new_parent)
 				start_pos = new_parent.mapFromGlobal(old_global)
-				cw.move(start_pos)
-				cw.show()
+				card_widget.move(start_pos)
+				card_widget.show()
 			elif old_parent is None:
-				cw.setParent(new_parent)
-				cw.move(new_pos)
-				cw.show()
+				card_widget.setParent(new_parent)
+				card_widget.move(new_pos)
+				card_widget.show()
 
-			if cw.pos() != new_pos:
-				animate_move(cw, cw.pos(), new_pos, duration=165)
+			if card_widget.pos() != new_pos:
+				if getattr(self, "_is_deal_shuffle_setup", False):
+					card_widget.move(new_pos)
+				else:
+					animate_move(card_widget, card_widget.pos(), new_pos, duration=220)
 			else:
-				cw.move(new_pos)
+				card_widget.move(new_pos)
 
-		cw.set_drag_payload(payload_str, is_draggable, drag_sequence)
-		cw.set_selected(is_selected)
-		cw.show()
-		cw.raise_()
+		card_widget.set_drag_payload(payload_str, is_draggable, drag_sequence)
+		card_widget.set_selected(is_selected)
+		if not (getattr(self, "_deal_shuffle_active", False) and getattr(card_widget, "_deal_hidden", False)):
+			card_widget.show()
+		card_widget.raise_()
 
 	def _render(self):
 		"""Render full board from current state and emit updated move count."""
 		if self.state is None:
 			return
 
+		is_shuffle_setup = bool(getattr(self, "_play_deal_shuffle_on_next_render", False))
+		self._is_deal_shuffle_setup = is_shuffle_setup
+
 		self.setUpdatesEnabled(False)
 		try:
 			self._render_freecells()
 			self._render_foundations()
 			self._render_tableau()
+			if is_shuffle_setup:
+				self._play_deal_shuffle_animation_if_needed()
 		finally:
+			self._is_deal_shuffle_setup = False
 			self.setUpdatesEnabled(True)
 			self.update()
 
 		self.move_count_changed.emit(self.move_count)
+
+	def _play_deal_shuffle_animation_if_needed(self):
+		"""Run one-shot shuffle intro animation when a new table is initialized."""
+		if not getattr(self, "_play_deal_shuffle_on_next_render", False):
+			return
+		self._cancel_deal_shuffle_animation()
+		self._play_deal_shuffle_on_next_render = False
+
+		if self.state is None or not self._card_registry:
+			return
+
+		deck_anchor_global = self.mapToGlobal(QPoint(max(12, self.width() // 2 - 36), 12))
+		ordered_widgets = []
+		max_height = max((len(col_cards) for col_cards in self.state.tableau), default=0)
+		for layer in range(max_height):
+			for col_cards in self.state.tableau:
+				if layer >= len(col_cards):
+					continue
+				card = col_cards[layer]
+				widget = self._card_registry.get(card)
+				if widget is not None and widget.parentWidget() is not None:
+					ordered_widgets.append(widget)
+
+		deal_steps = []
+		for index, widget in enumerate(ordered_widgets):
+			parent = widget.parentWidget()
+			target_pos = QPoint(widget.pos())
+			start_pos = parent.mapFromGlobal(deck_anchor_global)
+			start_pos.setX(start_pos.x() + ((index % 7) - 3) * _DEAL_JITTER_X_STEP)
+			start_pos.setY(start_pos.y() + ((index % 5) - 2) * _DEAL_JITTER_Y_STEP)
+			widget.move(start_pos)
+			widget._deal_hidden = True
+			widget.hide()
+			deal_steps.append((widget, QPoint(start_pos), QPoint(target_pos)))
+
+		self._deal_shuffle_queue = deal_steps
+		if not self._deal_shuffle_queue:
+			self._deal_shuffle_active = False
+			return
+		self._deal_shuffle_active = True
+
+		if self._deal_shuffle_timer is None:
+			self._deal_shuffle_timer = QTimer(self)
+			self._deal_shuffle_timer.timeout.connect(
+				self._advance_deal_shuffle
+			)
+
+		self._deal_shuffle_timer.start(_DEAL_ANIMATION_INTERVAL_MS)
+		self._advance_deal_shuffle()
+
+	def _run_deal_shuffle_step(self, widget, start_pos, target_pos):
+		"""Play sound and animate one dealt card step."""
+		try:
+			widget.move(start_pos)
+			widget._deal_hidden = False
+			widget.show()
+			widget.raise_()
+			play_card_drop_sound()
+			animate_move(widget, start_pos, target_pos, duration=_DEAL_ANIMATION_DURATION_MS, play_sound=False)
+		except RuntimeError:
+			return
+
+	def _advance_deal_shuffle(self):
+		"""Advance one step in queued deal-shuffle animation."""
+		if not self._deal_shuffle_queue:
+			if self._deal_shuffle_timer is not None:
+				self._deal_shuffle_timer.stop()
+			self._deal_shuffle_active = False
+			return
+
+		widget, start_pos, target_pos = self._deal_shuffle_queue.pop(0)
+		self._run_deal_shuffle_step(widget, start_pos, target_pos)
 
 	def _emit_status(self, message: str):
 		"""Forward status text through widget-level status signal.

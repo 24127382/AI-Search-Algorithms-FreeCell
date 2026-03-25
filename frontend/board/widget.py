@@ -9,6 +9,7 @@ from frontend.board.move_core_mixin import BoardMoveCoreMixin
 from frontend.board.solver_mixin import BoardSolverMixin
 from frontend.board.ui_render_mixin import BoardUiRenderMixin
 from frontend.board.ui_layout_mixin import BoardUiLayoutMixin
+from frontend.shared.sound import play_win_sound
 from frontend.shared.qt import Signal, QWidget
 
 
@@ -72,6 +73,11 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self._tableau_layouts = []
 		self._card_registry = {}
 		self._deal_number_label = None
+		self._play_deal_shuffle_on_next_render = False
+		self._is_deal_shuffle_setup = False
+		self._deal_shuffle_timer = None
+		self._deal_shuffle_queue = []
+		self._deal_shuffle_active = False
 
 		self._build_ui()
 		self.new_game()
@@ -101,6 +107,7 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	def new_game(self):
 		"""Reset game/session counters and render a new deal."""
 		solver_stopped = self._stop_solver_execution()
+		self._cancel_deal_shuffle_animation()
 		self._pre_win_snapshot = None
 		self._last_announced_win_board_code = None
 		self.initial_state = self._build_initial_state()
@@ -108,6 +115,7 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.history.clear()
 		self.move_count = 0
 		self.selected_source = None
+		self._play_deal_shuffle_on_next_render = True
 		self._render()
 		if solver_stopped:
 			self._emit_status(f"Solver stopped. New game started - Deal #{self.current_deal_number}.")
@@ -117,6 +125,8 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	def resizeEvent(self, event):
 		"""Keep card widgets aligned/visible when the board is resized."""
 		super().resizeEvent(event)
+		if getattr(self, "_deal_shuffle_active", False):
+			return
 		if self.state is not None:
 			self._render()
 
@@ -185,4 +195,5 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		if self._last_announced_win_board_code == board_code:
 			return
 		self._last_announced_win_board_code = board_code
+		play_win_sound()
 		self.game_won.emit()

@@ -477,11 +477,13 @@ class BoardSolverMixin:
 			self._emit_status("Cannot restart: initial state not available.")
 			return
 		solver_stopped = self._stop_solver_execution()
+		self._cancel_deal_shuffle_animation()
 
 		self.state = deepcopy(self.initial_state)
 		self.history.clear()
 		self.move_count = 0
 		self.selected_source = None
+		self._play_deal_shuffle_on_next_render = True
 		self._render()
 		if solver_stopped:
 			self._emit_status("Solver stopped. Game restarted.")
