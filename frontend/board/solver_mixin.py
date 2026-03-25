@@ -341,6 +341,9 @@ class BoardSolverMixin:
 
 	def undo(self):
 		"""Revert one move from history if available."""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if not self.history:
 			self._emit_status("No moves to undo.")
 			return
@@ -487,6 +490,9 @@ class BoardSolverMixin:
 
 	def auto_to_foundation(self):
 		"""Execute first legal move that sends a card to foundation."""
+		if self.is_solver_mode_active():
+			self._emit_solver_interaction_locked()
+			return
 		if self.state is None:
 			return
 

@@ -58,6 +58,7 @@ class BoardUiRenderMixin:
 
 		cw.set_drag_payload(payload_str, is_draggable, drag_sequence)
 		cw.set_selected(is_selected)
+		cw.show()
 		cw.raise_()
 
 	def _render(self):

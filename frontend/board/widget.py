@@ -114,6 +114,12 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 			return
 		self._emit_status(f"New game started - Deal #{self.current_deal_number}.")
 
+	def resizeEvent(self, event):
+		"""Keep card widgets aligned/visible when the board is resized."""
+		super().resizeEvent(event)
+		if self.state is not None:
+			self._render()
+
 	def _capture_pre_win_snapshot(
 		self,
 		prev_state: State | None = None,

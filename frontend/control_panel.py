@@ -28,6 +28,8 @@ class ControlPanel(QWidget):
 		self._move_count_label = QLabel("Moves: 0")
 		self._move_count_label.setObjectName("MoveCountLabel")
 		self._stop_solver_button = None
+		self._undo_button = None
+		self._auto_foundation_button = None
 		self._build_ui()
 		
 		self.setStyleSheet("""
@@ -111,9 +113,9 @@ class ControlPanel(QWidget):
 		restart_button.clicked.connect(self.restart_requested.emit)
 		layout.addWidget(restart_button, 0, 1)
 
-		undo_button = QPushButton("Undo")
-		undo_button.clicked.connect(self.undo_requested.emit)
-		layout.addWidget(undo_button, 0, 2)
+		self._undo_button = QPushButton("Undo")
+		self._undo_button.clicked.connect(self.undo_requested.emit)
+		layout.addWidget(self._undo_button, 0, 2)
 
 		solver_button = QPushButton("Solver")
 		solver_menu = QMenu(solver_button)
@@ -124,9 +126,9 @@ class ControlPanel(QWidget):
 		solver_button.setMenu(solver_menu)
 		layout.addWidget(solver_button, 0, 3, Qt.AlignmentFlag.AlignHCenter)
 
-		auto_button = QPushButton("Auto Foundation")
-		auto_button.clicked.connect(self.auto_foundation_requested.emit)
-		layout.addWidget(auto_button, 0, 4)
+		self._auto_foundation_button = QPushButton("Auto Foundation")
+		self._auto_foundation_button.clicked.connect(self.auto_foundation_requested.emit)
+		layout.addWidget(self._auto_foundation_button, 0, 4)
 
 		layout.setColumnStretch(5, 1)
 		layout.addWidget(self._move_count_label, 0, 6)
@@ -157,4 +159,8 @@ class ControlPanel(QWidget):
 		if self._stop_solver_button is None:
 			return
 		self._stop_solver_button.setVisible(is_running)
+		if self._undo_button is not None:
+			self._undo_button.setEnabled(not is_running)
+		if self._auto_foundation_button is not None:
+			self._auto_foundation_button.setEnabled(not is_running)
 
