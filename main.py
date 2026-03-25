@@ -1,4 +1,8 @@
+import os
 import sys
+
+os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.ffmpeg=false")
+
 from frontend.main_window import DealNumberDialog, MainWindow
 from frontend.shared.qt import QApplication, QDialog
 
