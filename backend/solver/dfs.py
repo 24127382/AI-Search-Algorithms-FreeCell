@@ -1,29 +1,93 @@
-import time
+import os
+from time import perf_counter
+from typing import Callable, List, Optional
+
 from backend.engine.engine import apply_move, get_valid_moves
+
+
+DFS_RUNTIME_LOG_ENABLED = os.environ.get("DFS_RUNTIME_LOG", "1") != "0"
 
 class DFSAlgorithm:
     """Depth-First Search solver with performance metrics."""
 
-    def __init__(self, game_state):
+    def __init__(self, game_state, should_cancel: Optional[Callable] = None):
         """Store initial game state for DFS search.
 
         Args:
             game_state: Initial board state.
+            should_cancel: Optional callable returning True when solve should stop.
         """
         self.game_state = game_state
-        # Kh?i t?o c�c bi?n luu tr? th�ng s?
+        self.should_cancel = should_cancel or (lambda: False)
+        self.last_run_stats = None
+
+        # Backward-compatible public fields used by existing scripts.
         self.expanded_nodes = 0
         self.peak_stack_size = 0
         self.execution_time_ms = 0.0
 
-    def search(self):
+    def _finalize_stats(self, stats: dict, started_at: float, solution_found: bool) -> None:
+        """Finalize and persist run statistics.
+
+        Args:
+            stats: Mutable stats dictionary.
+            started_at: Run start timestamp from perf_counter().
+            solution_found: Whether run found a valid solution path.
+        """
+        stats["elapsed_ms"] = (perf_counter() - started_at) * 1000
+        stats["solution_found"] = solution_found
+        expanded_nodes = max(stats.get("expanded_nodes", 0), 1)
+        generated_nodes = stats.get("generated_nodes", 0)
+        pruned_by_visited = stats.get("pruned_by_visited", 0)
+        stats["effective_branching_factor"] = generated_nodes / expanded_nodes
+        stats["visited_prune_rate"] = pruned_by_visited / max(generated_nodes, 1)
+        self.last_run_stats = stats
+
+        # Keep legacy counters in sync.
+        self.execution_time_ms = stats["elapsed_ms"]
+        self.expanded_nodes = stats.get("expanded_nodes", 0)
+        self.peak_stack_size = stats.get("peak_frontier_size", 0)
+
+    def format_last_run_stats(self) -> str:
+        """Build a compact human-readable report for last_run_stats.
+
+        Returns:
+            str: Multiline summary string.
+        """
+        if not self.last_run_stats:
+            return "No DFS stats available. Run search() first."
+
+        stats = self.last_run_stats
+
+        lines = [
+            "DFS Run Stats",
+            f"- solution_found: {stats.get('solution_found', False)}",
+            f"- elapsed_ms: {stats.get('elapsed_ms', 0.0):.2f}",
+            f"- solution_length: {stats.get('solution_length', 0)}",
+            f"- expanded_nodes: {stats.get('expanded_nodes', 0)}",
+            f"- generated_nodes: {stats.get('generated_nodes', 0)}",
+            f"- stale_stack_pops: {stats.get('stale_stack_pops', 0)}",
+            f"- pruned_by_visited: {stats.get('pruned_by_visited', 0)}",
+            f"- visited_prune_rate: {stats.get('visited_prune_rate', 0.0):.2%}",
+            f"- effective_branching_factor: {stats.get('effective_branching_factor', 0.0):.3f}",
+            f"- peak_frontier_size: {stats.get('peak_frontier_size', 0)}",
+            f"- peak_visited_size: {stats.get('peak_visited_size', 0)}",
+            f"- final_frontier_size: {stats.get('final_frontier_size', 0)}",
+            f"- final_visited_size: {stats.get('final_visited_size', 0)}",
+        ]
+        return "\n".join(lines)
+
+    def _log_progress(self) -> None:
+        """Print full runtime summary after a DFS run ends."""
+        print(self.format_last_run_stats())
+
+    def search(self) -> Optional[List]:
         """Execute DFS search and track performance metrics.
 
         Returns:
-            list: Path of moves from initial state to goal state, or None if no solution found.
+            list | None: Path of moves from start to goal, or None if unsolved.
         """
-        # B?t d?u do th?i gian
-        start_time = time.perf_counter()
+        started_at = perf_counter()
 
         # Stack stores tuples of (state, path_to_state)
         stack = [(self.game_state, [])]
@@ -32,55 +96,74 @@ class DFSAlgorithm:
         self.expanded_nodes = 0
         self.peak_stack_size = 0
 
+        stats = {
+            "expanded_nodes": 0,
+            "generated_nodes": 0,
+            "stale_stack_pops": 0,
+            "pruned_by_visited": 0,
+            "peak_frontier_size": 1,
+            "peak_visited_size": 0,
+            "solution_length": 0,
+        }
+
         while stack:
-            # Ghi nh?n k�ch thu?c Stack l?n nh?t (Peak Stack Size)
-            if len(stack) > self.peak_stack_size:
-                self.peak_stack_size = len(stack)
+            if self.should_cancel():
+                return None
+
+            if len(stack) > stats["peak_frontier_size"]:
+                stats["peak_frontier_size"] = len(stack)
+            if len(visited) > stats["peak_visited_size"]:
+                stats["peak_visited_size"] = len(visited)
 
             state, path = stack.pop()
             state_hash = hash(state)
 
             if state_hash in visited:
+                stats["stale_stack_pops"] += 1
                 continue
-            
-            # ��nh d?u d� tham v� tang bi?n d?m s? node d� khai tri?n
+
             visited.add(state_hash)
-            self.expanded_nodes += 1
+            stats["expanded_nodes"] += 1
 
             if state.is_goal:
-                self.execution_time_ms = (time.perf_counter() - start_time) * 1000
-                self._print_stats(path, visited)
+                stats["solution_length"] = len(path)
+                stats["final_frontier_size"] = len(stack)
+                stats["final_visited_size"] = len(visited)
+                self._finalize_stats(stats, started_at, solution_found=True)
+                if DFS_RUNTIME_LOG_ENABLED:
+                    self._log_progress()
                 return path
 
             valid_moves = get_valid_moves(state)
 
             for move in valid_moves:
+                if self.should_cancel():
+                    return None
+
                 new_state = apply_move(state, move)
+                stats["generated_nodes"] += 1
+                new_state_hash = hash(new_state)
 
                 if new_state.is_goal:
                     final_path = path + [move]
-                    self.execution_time_ms = (time.perf_counter() - start_time) * 1000
-                    # C?p nh?t peak_stack_size m?t l?n cu?i n?u c?n
-                    self.peak_stack_size = max(self.peak_stack_size, len(stack) + 1)
-                    self._print_stats(final_path, visited)
+                    stats["solution_length"] = len(final_path)
+                    stats["peak_frontier_size"] = max(stats["peak_frontier_size"], len(stack) + 1)
+                    stats["final_frontier_size"] = len(stack)
+                    stats["final_visited_size"] = len(visited)
+                    self._finalize_stats(stats, started_at, solution_found=True)
+                    if DFS_RUNTIME_LOG_ENABLED:
+                        self._log_progress()
                     return final_path
 
-                if hash(new_state) not in visited:
-                    stack.append((new_state, path + [move]))
+                if new_state_hash in visited:
+                    stats["pruned_by_visited"] += 1
+                    continue
 
-        # Tru?ng h?p kh�ng t�m th?y du?ng di (Unsolvable)
-        self.execution_time_ms = (time.perf_counter() - start_time) * 1000
-        self._print_stats(None, visited)
+                stack.append((new_state, path + [move]))
+
+        stats["final_frontier_size"] = len(stack)
+        stats["final_visited_size"] = len(visited)
+        self._finalize_stats(stats, started_at, solution_found=False)
+        if DFS_RUNTIME_LOG_ENABLED:
+            self._log_progress()
         return None
-
-    def _print_stats(self, path, visited):
-        """Print DFS search statistics."""
-        total_steps = len(path) if path else 0
-        nodes_visited = len(visited)
-        print(f"\n--- DFS Search Results ---")
-        print(f"Time (ms): {self.execution_time_ms:.2f}")
-        print(f"Total Steps: {total_steps}")
-        print(f"Expanded Nodes: {self.expanded_nodes}")
-        print(f"Peak Frontier: {self.peak_stack_size}")
-        print(f"Nodes Visited: {nodes_visited}")
-        print(f"----------------------------\n")

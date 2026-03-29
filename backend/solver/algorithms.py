@@ -19,8 +19,8 @@ class SearchAlgorithm:
         self.game_state = game_state
         self.should_cancel = should_cancel or (lambda: False)
         self._handlers = {
-            "BFS": BFSAlgorithm(self.game_state).search,
-            "DFS": DFSAlgorithm(self.game_state).search,
+            "BFS": BFSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
+            "DFS": DFSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
             "UCS": UCSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
             "A*": AStarAlgorithm(self.game_state,weight=5.0, should_cancel=self.should_cancel).search,
         }
