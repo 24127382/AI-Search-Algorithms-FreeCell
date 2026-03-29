@@ -1,0 +1,56 @@
+[
+  {
+    "algorithm": "BFS",
+    "time_seconds": 38.058040142059326,
+    "peak_memory_mb": 200.22270584106445,
+    "expanded_nodes": 50000,
+    "solution_length": -1,
+    "frontier_max_size": 24265,
+    "deal_id": 0
+  },
+  {
+    "algorithm": "DFS",
+    "time_seconds": 0.9311113357543945,
+    "peak_memory_mb": 6.831081390380859,
+    "expanded_nodes": 520,
+    "solution_length": 300,
+    "frontier_max_size": 2752,
+    "deal_id": 0
+  },
+  {
+    "algorithm": "BFS",
+    "time_seconds": 51.367390155792236,
+    "peak_memory_mb": 241.53909301757812,
+    "expanded_nodes": 50000,
+    "solution_length": -1,
+    "frontier_max_size": 37898,
+    "deal_id": 1
+  },
+  {
+    "algorithm": "DFS",
+    "time_seconds": 1.5326919555664062,
+    "peak_memory_mb": 9.13385009765625,
+    "expanded_nodes": 2509,
+    "solution_length": 256,
+    "frontier_max_size": 1751,
+    "deal_id": 1
+  },
+  {
+    "algorithm": "BFS",
+    "time_seconds": 51.13281846046448,
+    "peak_memory_mb": 217.13265228271484,
+    "expanded_nodes": 50000,
+    "solution_length": -1,
+    "frontier_max_size": 30453,
+    "deal_id": 2
+  },
+  {
+    "algorithm": "DFS",
+    "time_seconds": 6.2504425048828125,
+    "peak_memory_mb": 38.76372528076172,
+    "expanded_nodes": 6069,
+    "solution_length": 1054,
+    "frontier_max_size": 8931,
+    "deal_id": 2
+  }
+]
