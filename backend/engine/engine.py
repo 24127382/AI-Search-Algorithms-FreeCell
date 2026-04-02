@@ -1,6 +1,7 @@
 """Core move generation and state transition utilities for FreeCell search."""
 
 from typing import List, Optional, Tuple
+
 from backend.model.move import Move, MoveType
 from backend.model.state import State
 from backend.rule.rules import (
@@ -21,7 +22,7 @@ def _auto_foundation_priority(move: Move) -> tuple[int, int, int, int]:
     Returns:
         Tuple[int, int, int, int]: Priority key used by `min`.
     """
-    from_type_priority = 0 if move.from_pos[0] == 'freecell' else 1
+    from_type_priority = 0 if move.from_pos[0] == "freecell" else 1
     return (move.card.rank_val, from_type_priority, move.from_pos[1], move.to_pos[1])
 
 
@@ -35,13 +36,13 @@ def _move_priority(move: Move) -> tuple[int, int, int, int, int]:
         Tuple[int, int, int, int, int]: Priority key where smaller means earlier.
     """
     sequence_len = len(move.sequence) if move.sequence else 1
-    if move.to_pos[0] == 'foundation':
+    if move.to_pos[0] == "foundation":
         group = 0
-    elif move.from_pos[0] == 'freecell' and move.to_pos[0] == 'tableau':
+    elif move.from_pos[0] == "freecell" and move.to_pos[0] == "tableau":
         group = 1
-    elif move.to_pos[0] == 'tableau' and sequence_len > 1:
+    elif move.to_pos[0] == "tableau" and sequence_len > 1:
         group = 2
-    elif move.to_pos[0] == 'tableau':
+    elif move.to_pos[0] == "tableau":
         group = 3
     else:
         group = 4
@@ -67,7 +68,7 @@ def _is_immediate_undo(candidate: Move, last_move: Optional[Move]) -> bool:
     last_len = len(last_move.sequence) if last_move.sequence else 1
     if candidate_len != 1 or last_len != 1:
         return False
-    if candidate.to_pos[0] == 'foundation' or candidate.from_pos[0] == 'foundation':
+    if candidate.to_pos[0] == "foundation" or candidate.from_pos[0] == "foundation":
         return False
     return candidate.card == last_move.card
 
@@ -96,8 +97,8 @@ def _safe_foundation_move_from_tableau(state: State, col_idx: int) -> Optional[M
     return Move(
         MoveType.TABLEAU_TO_FOUNDATION,
         card,
-        ('tableau', col_idx),
-        ('foundation', f_idx),
+        ("tableau", col_idx),
+        ("foundation", f_idx),
         sequence=(card,),
     )
 
@@ -125,8 +126,8 @@ def _safe_foundation_move_from_freecell(state: State, cell_idx: int) -> Optional
     return Move(
         MoveType.FREECELL_TO_FOUNDATION,
         card,
-        ('freecell', cell_idx),
-        ('foundation', f_idx),
+        ("freecell", cell_idx),
+        ("foundation", f_idx),
         sequence=(card,),
     )
 
@@ -179,13 +180,19 @@ def apply_forced_foundation_closure(state: State) -> tuple[State, Tuple[Move, ..
     return current_state, tuple(forced_moves)
 
 
-def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[Move] = None) -> List[Move]:
+def get_valid_moves(
+    state: State,
+    prune_safe: bool = True,
+    last_move: Optional[Move] = None,
+    prune_canonical_redundant: bool = False,
+) -> List[Move]:
     """Generate legal moves for the current state.
 
     Args:
         state: Current board state.
         prune_safe: Whether to collapse safe-foundation branches to one move.
         last_move: Optional previous move used to prune immediate undo actions.
+        prune_canonical_redundant: Whether to prune canonical-equivalent moves.
 
     Returns:
         List[Move]: Deterministically ordered legal moves.
@@ -198,12 +205,16 @@ def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[M
         sequences = get_movable_sequences(column)
         for sequence in sequences:
             if len(sequence) <= max_seq_len:
-                destinations = find_valid_destinations(state, sequence, ('tableau', col_idx), max_seq_len)
+                destinations = find_valid_destinations(
+                    state, sequence, ("tableau", col_idx), max_seq_len
+                )
                 moves.extend(destinations)
 
     for cell_idx, card in enumerate(state.freecells):
         if card is not None:
-            destinations = find_valid_destinations(state, [card], ('freecell', cell_idx), max_seq_len)
+            destinations = find_valid_destinations(
+                state, [card], ("freecell", cell_idx), max_seq_len
+            )
             moves.extend(destinations)
 
     # Auto-move pruning: if any move to foundation is "safe", choose a single
@@ -215,6 +226,31 @@ def get_valid_moves(state: State, prune_safe: bool = True, last_move: Optional[M
 
     if last_move is not None:
         moves = [move for move in moves if not _is_immediate_undo(move, last_move)]
+
+    if prune_canonical_redundant:
+        pruned_moves: list[Move] = []
+        seen_empty_tableau_targets: set[tuple[str, int, tuple[int, ...]]] = set()
+
+        for move in moves:
+            from_type, from_idx = move.from_pos
+            to_type, to_idx = move.to_pos
+
+            # Freecell slot identity is canonicalized away in State.board_code.
+            if from_type == "freecell" and to_type == "freecell":
+                continue
+
+            # Empty tableau columns are symmetric under canonical tableau sorting.
+            if to_type == "tableau" and not state.tableau[to_idx]:
+                sequence = move.sequence if move.sequence else (move.card,)
+                sequence_key = tuple(card.to_int() for card in sequence)
+                symmetry_key = (from_type, from_idx, sequence_key)
+                if symmetry_key in seen_empty_tableau_targets:
+                    continue
+                seen_empty_tableau_targets.add(symmetry_key)
+
+            pruned_moves.append(move)
+
+        moves = pruned_moves
 
     moves.sort(key=_move_priority)
     return moves
@@ -243,9 +279,11 @@ def _apply_single_move(state: State, move: Move) -> State:
 
     moving_cards = list(move.sequence) if move.sequence else [move.card]
 
-    if from_type == 'tableau':
+    if from_type == "tableau":
         if not move.sequence:
-            raise ValueError("Tableau moves must include move.sequence to avoid ambiguous state transitions")
+            raise ValueError(
+                "Tableau moves must include move.sequence to avoid ambiguous state transitions"
+            )
 
         col = new_tableau[from_idx]
         n = len(move.sequence)
@@ -254,15 +292,15 @@ def _apply_single_move(state: State, move: Move) -> State:
             raise ValueError("move.sequence does not match source tableau top sequence")
         new_tableau[from_idx] = col[:-n]
         touched_tableau_indices.add(from_idx)
-    elif from_type == 'freecell':
+    elif from_type == "freecell":
         new_freecells[from_idx] = None
 
-    if to_type == 'tableau':
+    if to_type == "tableau":
         new_tableau[to_idx].extend(moving_cards)
         touched_tableau_indices.add(to_idx)
-    elif to_type == 'freecell':
+    elif to_type == "freecell":
         new_freecells[to_idx] = moving_cards[0]
-    elif to_type == 'foundation':
+    elif to_type == "foundation":
         new_foundations[to_idx].append(moving_cards[0])
 
     return State.from_transition(
@@ -272,6 +310,7 @@ def _apply_single_move(state: State, move: Move) -> State:
         foundations=new_foundations,
         touched_tableau_indices=touched_tableau_indices,
     )
+
 
 def apply_move(state: State, move: Move, collapse_forced: bool = False) -> State:
     """Apply one move with optional forced-foundation closure.

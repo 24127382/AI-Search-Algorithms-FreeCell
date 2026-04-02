@@ -19,11 +19,17 @@ class State:
     tableau: Tuple[Tuple[Card, ...], ...]
     freecells: Tuple[Optional[Card], ...]
     foundations: Tuple[Tuple[Card, ...], ...]
-    _encoded_columns: Tuple[Tuple[int, ...], ...] = field(init=False, repr=False, compare=False, hash=False)
+    _encoded_columns: Tuple[Tuple[int, ...], ...] = field(
+        init=False, repr=False, compare=False, hash=False
+    )
     _foundation_bits: int = field(init=False, repr=False, compare=False, hash=False)
     _freecell_bits: int = field(init=False, repr=False, compare=False, hash=False)
-    _top_signature: Tuple[int, ...] = field(init=False, repr=False, compare=False, hash=False)
-    _board_key: Tuple[int, ...] = field(init=False, repr=False, compare=False, hash=False)
+    _top_signature: Tuple[int, ...] = field(
+        init=False, repr=False, compare=False, hash=False
+    )
+    _board_key: Tuple[int, ...] = field(
+        init=False, repr=False, compare=False, hash=False
+    )
     _board_code: int = field(init=False, repr=False, compare=False, hash=False)
     _hash_value: int = field(init=False, repr=False, compare=False, hash=False)
 
@@ -34,7 +40,9 @@ class State:
         Returns:
             bool: `True` when each foundation ends at King.
         """
-        return all(foundation and foundation[-1].rank == "K" for foundation in self.foundations)
+        return all(
+            foundation and foundation[-1].rank == "K" for foundation in self.foundations
+        )
 
     def __post_init__(self):
         """Normalize containers and initialize cached encodings."""
@@ -47,7 +55,9 @@ class State:
         object.__setattr__(self, "foundations", foundations)
         self._refresh_cached_encodings()
 
-    def _refresh_cached_encodings(self, encoded_columns: Optional[Tuple[Tuple[int, ...], ...]] = None):
+    def _refresh_cached_encodings(
+        self, encoded_columns: Optional[Tuple[Tuple[int, ...], ...]] = None
+    ):
         """Refresh canonical encodings used for hashing and equality.
 
         Args:
@@ -58,7 +68,9 @@ class State:
         packed_freecells = self._pack_freecells(self.freecells)
 
         if encoded_columns is None:
-            encoded_columns = tuple(self._encode_column(column) for column in self.tableau)
+            encoded_columns = tuple(
+                self._encode_column(column) for column in self.tableau
+            )
 
         board_key = self._encode_board_key(foundation_lengths, encoded_columns)
         board_code = self._encode_board_integer(board_key)
@@ -97,10 +109,11 @@ class State:
         Returns:
             Tuple[int, ...]: Canonical token stream key.
         """
-        freecell_cards = sorted(card.to_int() for card in self.freecells if card is not None)
+        freecell_cards = sorted(
+            card.to_int() for card in self.freecells if card is not None
+        )
         freecell_key = tuple(
-            freecell_cards[idx] if idx < len(freecell_cards) else 0
-            for idx in range(4)
+            freecell_cards[idx] if idx < len(freecell_cards) else 0 for idx in range(4)
         )
         tableau_key = tuple(sorted(encoded_columns))
 
@@ -111,7 +124,9 @@ class State:
 
         return tuple(token_stream)
 
-    def _build_top_signature(self, foundation_lengths: Tuple[int, ...]) -> Tuple[int, ...]:
+    def _build_top_signature(
+        self, foundation_lengths: Tuple[int, ...]
+    ) -> Tuple[int, ...]:
         """Build compact signature from visible tops and foundation lengths.
 
         Args:
@@ -120,8 +135,12 @@ class State:
         Returns:
             Tuple[int, ...]: Top-card signature used by heuristics/caching.
         """
-        tableau_top = tuple(column[-1].to_int() if column else 0 for column in self.tableau)
-        freecell_sig = tuple(card.to_int() if card is not None else 0 for card in self.freecells)
+        tableau_top = tuple(
+            column[-1].to_int() if column else 0 for column in self.tableau
+        )
+        freecell_sig = tuple(
+            card.to_int() if card is not None else 0 for card in self.freecells
+        )
         return (*tableau_top, *freecell_sig, *foundation_lengths)
 
     @staticmethod
@@ -222,7 +241,9 @@ class State:
 
         encoded_columns = list(prev_state._encoded_columns)
         for idx in set(touched_tableau_indices):
-            encoded_columns[idx] = tuple(card.to_int() for card in normalized_tableau[idx])
+            encoded_columns[idx] = tuple(
+                card.to_int() for card in normalized_tableau[idx]
+            )
 
         state = cls.__new__(cls)
         object.__setattr__(state, "tableau", normalized_tableau)

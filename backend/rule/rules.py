@@ -12,12 +12,13 @@ _BLACK_OPP_FOUNDATION_IDX = (0, 1)
 _MAX_FREECELLS = 4
 _MAX_TABLEAU_COLUMNS = 8
 _SUPERMOVE_LIMITS = {
-    (empty_freecells, empty_tableau): (empty_freecells + 1) * (2 ** empty_tableau)
+    (empty_freecells, empty_tableau): (empty_freecells + 1) * (2**empty_tableau)
     for empty_freecells in range(_MAX_FREECELLS + 1)
     for empty_tableau in range(_MAX_TABLEAU_COLUMNS + 1)
 }
 _SUPERMOVE_TO_EMPTY_LIMITS = {
-    (empty_freecells, empty_tableau): (empty_freecells + 1) * (2 ** max(empty_tableau - 1, 0))
+    (empty_freecells, empty_tableau): (empty_freecells + 1)
+    * (2 ** max(empty_tableau - 1, 0))
     for empty_freecells in range(_MAX_FREECELLS + 1)
     for empty_tableau in range(_MAX_TABLEAU_COLUMNS + 1)
 }
@@ -66,7 +67,10 @@ def _build_tableau_pair_lookup() -> tuple[tuple[bool, ...], ...]:
 
 _TABLEAU_PAIR_VALID = _build_tableau_pair_lookup()
 
-def can_move_to_foundation(card: Card, foundation: Tuple[Card, ...], f_idx: int) -> bool:
+
+def can_move_to_foundation(
+    card: Card, foundation: Tuple[Card, ...], f_idx: int
+) -> bool:
     """Check whether a card can be placed onto a foundation pile.
 
     Args:
@@ -82,6 +86,7 @@ def can_move_to_foundation(card: Card, foundation: Tuple[Card, ...], f_idx: int)
 
     return card.rank_val == len(foundation) + 1
 
+
 def is_safe_to_foundation(state: State, card: Card) -> bool:
     """Check whether moving a card to foundation is strategically safe.
 
@@ -94,13 +99,16 @@ def is_safe_to_foundation(state: State, card: Card) -> bool:
     """
     rank_val = card.rank_val
     if rank_val <= 2:
-        return True # Aces and Twos are always safe
+        return True  # Aces and Twos are always safe
 
-    opp_foundation_idx = _RED_OPP_FOUNDATION_IDX if card.color == 'red' else _BLACK_OPP_FOUNDATION_IDX
+    opp_foundation_idx = (
+        _RED_OPP_FOUNDATION_IDX if card.color == "red" else _BLACK_OPP_FOUNDATION_IDX
+    )
     for suit_idx in opp_foundation_idx:
         if len(state.foundations[suit_idx]) < rank_val - 1:
             return False
     return True
+
 
 def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
     """Check whether a card can be placed on a tableau column.
@@ -120,7 +128,9 @@ def can_move_to_tableau(card: Card, tableau_col: Tuple[Card, ...]) -> bool:
 
 
 @lru_cache(maxsize=50000)
-def _get_movable_sequences_cached(column: Tuple[Card, ...]) -> Tuple[Tuple[Card, ...], ...]:
+def _get_movable_sequences_cached(
+    column: Tuple[Card, ...],
+) -> Tuple[Tuple[Card, ...], ...]:
     """Return all movable suffix sequences for a tableau column.
 
     Args:
@@ -200,16 +210,18 @@ def find_valid_destinations(
         for f_idx, foundation in enumerate(state.foundations):
             if can_move_to_foundation(base_card, foundation, f_idx):
                 move = Move(
-                    MoveType.TABLEAU_TO_FOUNDATION if from_pos[0] == 'tableau' else MoveType.FREECELL_TO_FOUNDATION,
+                    MoveType.TABLEAU_TO_FOUNDATION
+                    if from_pos[0] == "tableau"
+                    else MoveType.FREECELL_TO_FOUNDATION,
                     base_card,
                     from_pos,
-                    ('foundation', f_idx),
+                    ("foundation", f_idx),
                     sequence=tuple(sequence),
                 )
                 valid_destinations.append(move)
 
     for t_idx, tableau_col in enumerate(state.tableau):
-        if from_pos[0] == 'tableau' and t_idx == from_pos[1]:
+        if from_pos[0] == "tableau" and t_idx == from_pos[1]:
             continue
 
         if can_move_to_tableau(base_card, tableau_col):
@@ -221,29 +233,31 @@ def find_valid_destinations(
 
             if is_valid_len:
                 move = Move(
-                    MoveType.TABLEAU_TO_TABLEAU if from_pos[0] == 'tableau' else MoveType.FREECELL_TO_TABLEAU,
+                    MoveType.TABLEAU_TO_TABLEAU
+                    if from_pos[0] == "tableau"
+                    else MoveType.FREECELL_TO_TABLEAU,
                     base_card,
                     from_pos,
-                    ('tableau', t_idx),
+                    ("tableau", t_idx),
                     sequence=tuple(sequence),
                 )
                 valid_destinations.append(move)
 
-    if len(sequence) == 1 and from_pos[0] in ('tableau', 'freecell'):
+    if len(sequence) == 1 and from_pos[0] in ("tableau", "freecell"):
         for c_idx, cell in enumerate(state.freecells):
             if cell is not None:
                 continue
 
             move_type = (
                 MoveType.TABLEAU_TO_FREECELL
-                if from_pos[0] == 'tableau'
+                if from_pos[0] == "tableau"
                 else MoveType.FREECELL_TO_FREECELL
             )
             move = Move(
                 move_type,
                 base_card,
                 from_pos,
-                ('freecell', c_idx),
+                ("freecell", c_idx),
                 sequence=tuple(sequence),
             )
             valid_destinations.append(move)
