@@ -7,6 +7,7 @@ OPTIMIZATION: Now uses true incremental updates via update_move() for ~20x
 faster hash computation compared to full recomputation.
 """
 
+import os
 from backend.engine.engine import apply_move, get_valid_moves
 from backend.solver.utils import get_zobrist_table, ZobristHash, ZobristTranscoder
 
