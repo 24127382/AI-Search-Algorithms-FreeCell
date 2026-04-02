@@ -7,6 +7,7 @@ OPTIMIZATION: Now uses true incremental updates via update_move() for ~20x
 faster hash computation compared to full recomputation.
 """
 
+import os
 from collections import deque
 from backend.engine.engine import apply_move, get_valid_moves
 from backend.solver.utils import get_zobrist_table, ZobristHash, ZobristTranscoder
@@ -27,6 +28,7 @@ class BFSAlgorithm:
 
         Args:
             game_state: Initial board state.
+            should_cancel: Optional callable returning True when solve should stop.
         """
         self.game_state = game_state
         self.zobrist_table = get_zobrist_table()
@@ -85,20 +87,42 @@ class BFSAlgorithm:
         
         queue = deque([(self.game_state, [], initial_hasher)])
         visited = set()
-        
+
+        stats = {
+            "expanded_nodes": 0,
+            "generated_nodes": 0,
+            "stale_queue_pops": 0,
+            "pruned_by_visited": 0,
+            "peak_frontier_size": 1,
+            "peak_visited_size": 0,
+            "solution_length": 0,
+        }
+
         while queue:
             state, path, state_hasher = queue.popleft()
             state_hash = state_hasher.get_hash()
             
             if state_hash in visited:
+                stats["stale_queue_pops"] += 1
                 continue
+
             visited.add(state_hash)
-            
+            stats["expanded_nodes"] += 1
+
             if state.is_goal:
+                stats["solution_length"] = len(path)
+                stats["final_frontier_size"] = len(queue)
+                stats["final_visited_size"] = len(visited)
+                self._finalize_stats(stats, started_at, solution_found=True)
+                if BFS_RUNTIME_LOG_ENABLED:
+                    self._log_progress()
                 return path
-            
+
             valid_moves = get_valid_moves(state)
             for move in valid_moves:
+                if self.should_cancel():
+                    return None
+
                 new_state = apply_move(state, move)
                 
                 # Use incremental update instead of full recomputation
