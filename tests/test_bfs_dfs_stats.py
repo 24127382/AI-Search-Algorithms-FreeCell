@@ -1,4 +1,5 @@
-from backend.model.card import Card, VALID_RANK, VALID_SUITS
+from backend.experiments.solver_stats import SolverStats
+from backend.model.card import VALID_RANK, VALID_SUITS, Card
 from backend.model.state import State
 from backend.solver.bfs import BFSAlgorithm
 from backend.solver.dfs import DFSAlgorithm
@@ -22,14 +23,14 @@ def _build_near_goal_state() -> State:
 
 def test_bfs_format_last_run_stats_before_search():
     solver = BFSAlgorithm(_build_near_goal_state())
-    report = solver.format_last_run_stats()
+    report = SolverStats.format_bfs(solver.last_run_stats)
 
     assert report == "No BFS stats available. Run search() first."
 
 
 def test_dfs_format_last_run_stats_before_search():
     solver = DFSAlgorithm(_build_near_goal_state())
-    report = solver.format_last_run_stats()
+    report = SolverStats.format_dfs(solver.last_run_stats)
 
     assert report == "No DFS stats available. Run search() first."
 
@@ -38,7 +39,7 @@ def test_bfs_format_last_run_stats_after_search_contains_core_metrics():
     solver = BFSAlgorithm(_build_near_goal_state())
 
     path = solver.search()
-    report = solver.format_last_run_stats()
+    report = SolverStats.format_bfs(solver.last_run_stats)
 
     assert path is not None
     assert "BFS Run Stats" in report
@@ -52,7 +53,7 @@ def test_dfs_format_last_run_stats_after_search_contains_core_metrics():
     solver = DFSAlgorithm(_build_near_goal_state())
 
     path = solver.search()
-    report = solver.format_last_run_stats()
+    report = SolverStats.format_dfs(solver.last_run_stats)
 
     assert path is not None
     assert "DFS Run Stats" in report

@@ -28,7 +28,9 @@ class _SoundManager:
         self._card_drop_pool_index = 0
 
     @staticmethod
-    def _create_player(sound_path: Path, volume: float, playback_rate: float = 1.0) -> tuple[QMediaPlayer, QAudioOutput]:
+    def _create_player(
+        sound_path: Path, volume: float, playback_rate: float = 1.0
+    ) -> tuple[QMediaPlayer, QAudioOutput]:
         audio_output = QAudioOutput()
         audio_output.setVolume(max(0.0, min(1.0, volume)))
 
@@ -78,7 +80,9 @@ class _SoundManager:
             return
 
         player = self._card_drop_players[self._card_drop_pool_index]
-        self._card_drop_pool_index = (self._card_drop_pool_index + 1) % len(self._card_drop_players)
+        self._card_drop_pool_index = (self._card_drop_pool_index + 1) % len(
+            self._card_drop_players
+        )
         self._play(player)
 
     def play_invalid_move(self):
