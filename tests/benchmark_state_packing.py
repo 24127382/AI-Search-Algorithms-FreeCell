@@ -21,24 +21,22 @@ from pathlib import Path
 from time import perf_counter
 from typing import Callable
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import backend.solver.astar as astar_module
+import backend.solver.bfs as bfs_module
+import backend.solver.dfs as dfs_module
+import backend.solver.search_utils.ucs_utils as ucs_utils
+import backend.solver.ucs as ucs_module
 from backend.engine.shuffle import deal_by_game_number
 from backend.model.state import State
 from backend.solver.astar import AStarAlgorithm
 from backend.solver.bfs import BFSAlgorithm
 from backend.solver.dfs import DFSAlgorithm
-from backend.solver.heuristics import combined_heuristic
-from backend.solver.ucs.ucs import UCSAlgorithm
-from backend.solver.ucs import ucs as ucs_module
-from backend.solver.ucs import ucs_utils
-import backend.solver.astar as astar_module
-import backend.solver.bfs as bfs_module
-import backend.solver.dfs as dfs_module
-
+from backend.solver.ucs import UCSAlgorithm
+from backend.solver.utils.heuristics import combined_heuristic
 
 PACKED_MODE = "packed"
 UNPACKED_MODE = "unpacked"
@@ -109,7 +107,9 @@ def _parse_algorithms(raw: str) -> list[str]:
         raise ValueError("--algorithms must contain at least one value")
     unknown = [name for name in algorithms if name not in ALL_ALGOS]
     if unknown:
-        raise ValueError(f"Unknown algorithm(s): {unknown}. Allowed: {', '.join(ALL_ALGOS)}")
+        raise ValueError(
+            f"Unknown algorithm(s): {unknown}. Allowed: {', '.join(ALL_ALGOS)}"
+        )
     return algorithms
 
 
@@ -148,8 +148,14 @@ def _state_key_mode(mode: str):
         selected_state_id = lambda state: state.board_code
         selected_hash = lambda state: hash(state.board_code)
     elif mode == UNPACKED_MODE:
-        selected_state_id = lambda state: (state.tableau, state.freecells, state.foundations)
-        selected_hash = lambda state: hash((state.tableau, state.freecells, state.foundations))
+        selected_state_id = lambda state: (
+            state.tableau,
+            state.freecells,
+            state.foundations,
+        )
+        selected_hash = lambda state: hash(
+            (state.tableau, state.freecells, state.foundations)
+        )
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
@@ -265,7 +271,9 @@ def _run_solver_logic_faithful(
                 else:
                     raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-                stop_reason = "solution_found" if path is not None else "frontier_exhausted"
+                stop_reason = (
+                    "solution_found" if path is not None else "frontier_exhausted"
+                )
 
     except ExpansionLimitReached:
         stop_reason = "max_expand"
@@ -312,7 +320,11 @@ def _print_algorithm_block(
         packed_last = packed_runs[-1]
         packed_mean = statistics.mean(run.elapsed_s for run in packed_runs)
         packed_median = statistics.median(run.elapsed_s for run in packed_runs)
-        packed_stdev = statistics.stdev(run.elapsed_s for run in packed_runs) if len(packed_runs) > 1 else 0.0
+        packed_stdev = (
+            statistics.stdev(run.elapsed_s for run in packed_runs)
+            if len(packed_runs) > 1
+            else 0.0
+        )
         packed_rate = (max_expand / packed_mean) if packed_mean > 0 else 0.0
         print(f"packed_unique_last_trial={packed_last.unique_states}")
         print(f"packed_mean={packed_mean:.6f}s packed_rate={packed_rate:.2f} nodes/s")
@@ -322,11 +334,19 @@ def _print_algorithm_block(
         unpacked_last = unpacked_runs[-1]
         unpacked_mean = statistics.mean(run.elapsed_s for run in unpacked_runs)
         unpacked_median = statistics.median(run.elapsed_s for run in unpacked_runs)
-        unpacked_stdev = statistics.stdev(run.elapsed_s for run in unpacked_runs) if len(unpacked_runs) > 1 else 0.0
+        unpacked_stdev = (
+            statistics.stdev(run.elapsed_s for run in unpacked_runs)
+            if len(unpacked_runs) > 1
+            else 0.0
+        )
         unpacked_rate = (max_expand / unpacked_mean) if unpacked_mean > 0 else 0.0
         print(f"unpacked_unique_last_trial={unpacked_last.unique_states}")
-        print(f"unpacked_mean={unpacked_mean:.6f}s unpacked_rate={unpacked_rate:.2f} nodes/s")
-        print(f"unpacked_median={unpacked_median:.6f}s unpacked_stdev={unpacked_stdev:.6f}s")
+        print(
+            f"unpacked_mean={unpacked_mean:.6f}s unpacked_rate={unpacked_rate:.2f} nodes/s"
+        )
+        print(
+            f"unpacked_median={unpacked_median:.6f}s unpacked_stdev={unpacked_stdev:.6f}s"
+        )
 
     if packed_runs and unpacked_runs:
         packed_mean = statistics.mean(run.elapsed_s for run in packed_runs)
@@ -373,8 +393,14 @@ def _print_memory_block(
     if unpacked_peak_mean is not None:
         print(f"unpacked_peak_mean={unpacked_peak_mean / (1024 * 1024):.3f} MB")
 
-    if packed_peak_mean is not None and unpacked_peak_mean is not None and packed_peak_mean > 0:
-        print(f"unpacked_over_packed_memory={unpacked_peak_mean / packed_peak_mean:.3f}x")
+    if (
+        packed_peak_mean is not None
+        and unpacked_peak_mean is not None
+        and packed_peak_mean > 0
+    ):
+        print(
+            f"unpacked_over_packed_memory={unpacked_peak_mean / packed_peak_mean:.3f}x"
+        )
 
     packed_bytes_per_unique = _mean_bytes_per_unique_state(packed_runs)
     unpacked_bytes_per_unique = _mean_bytes_per_unique_state(unpacked_runs)
@@ -386,8 +412,12 @@ def _print_memory_block(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Logic-faithful benchmark for packed vs unpacked keys")
-    parser.add_argument("--deal", type=int, default=1, help="Single deal number to benchmark")
+    parser = argparse.ArgumentParser(
+        description="Logic-faithful benchmark for packed vs unpacked keys"
+    )
+    parser.add_argument(
+        "--deal", type=int, default=1, help="Single deal number to benchmark"
+    )
     parser.add_argument(
         "--modes",
         type=str,
@@ -496,7 +526,9 @@ def main() -> int:
         memory_rng = random.Random(algorithm_seed + 100_003)
 
         for warmup_idx in range(args.warmup_trials):
-            for mode in _mode_order_for_trial(modes, warmup_idx, speed_rng, args.randomize_mode_order):
+            for mode in _mode_order_for_trial(
+                modes, warmup_idx, speed_rng, args.randomize_mode_order
+            ):
                 if args.gc_between_runs:
                     gc.collect()
                 _run_solver_logic_faithful(
@@ -512,7 +544,9 @@ def main() -> int:
 
         mode_runs: dict[str, list[RunResult]] = {mode: [] for mode in modes}
         for trial_idx in range(args.trials):
-            for mode in _mode_order_for_trial(modes, trial_idx, speed_rng, args.randomize_mode_order):
+            for mode in _mode_order_for_trial(
+                modes, trial_idx, speed_rng, args.randomize_mode_order
+            ):
                 if args.gc_between_runs:
                     gc.collect()
                 run = _run_solver_logic_faithful(
@@ -538,7 +572,9 @@ def main() -> int:
         if args.memory_trials > 0:
             memory_runs: dict[str, list[RunResult]] = {mode: [] for mode in modes}
             for trial_idx in range(args.memory_trials):
-                for mode in _mode_order_for_trial(modes, trial_idx, memory_rng, args.randomize_mode_order):
+                for mode in _mode_order_for_trial(
+                    modes, trial_idx, memory_rng, args.randomize_mode_order
+                ):
                     if args.gc_between_runs:
                         gc.collect()
                     run = _run_solver_logic_faithful(
@@ -560,7 +596,9 @@ def main() -> int:
             )
 
     if args.timeout_s is not None:
-        print(f"\nNote: Runs were limited to a maximum of {args.timeout_s:.3f} seconds each.")
+        print(
+            f"\nNote: Runs were limited to a maximum of {args.timeout_s:.3f} seconds each."
+        )
 
     return 0
 
