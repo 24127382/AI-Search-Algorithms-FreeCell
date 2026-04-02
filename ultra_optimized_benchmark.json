@@ -1,0 +1,44 @@
+[
+  {
+    "test": "BFS (Ultra-Optimized)",
+    "runtime_ms": 2169.9409000575542,
+    "nodes_expanded": 5000,
+    "hash_ops": 67011,
+    "avg_hash_time_us": 2.1053119051604283
+  },
+  {
+    "test": "DFS (Ultra-Optimized)",
+    "runtime_ms": 3505.7991000358015,
+    "nodes_expanded": 5000,
+    "hash_ops": 48109,
+    "avg_hash_time_us": 2.467214208093246
+  },
+  {
+    "test": "BFS (Ultra-Optimized)",
+    "runtime_ms": 961.9442999828607,
+    "nodes_expanded": 5000,
+    "hash_ops": 22459,
+    "avg_hash_time_us": 2.252269084093232
+  },
+  {
+    "test": "DFS (Ultra-Optimized)",
+    "runtime_ms": 605.5835001170635,
+    "nodes_expanded": 5000,
+    "hash_ops": 10654,
+    "avg_hash_time_us": 2.5579493502632236
+  },
+  {
+    "test": "BFS (Ultra-Optimized)",
+    "runtime_ms": 1467.3193998169154,
+    "nodes_expanded": 5000,
+    "hash_ops": 40017,
+    "avg_hash_time_us": 2.162768491898862
+  },
+  {
+    "test": "DFS (Ultra-Optimized)",
+    "runtime_ms": 810.2218001149595,
+    "nodes_expanded": 5000,
+    "hash_ops": 17316,
+    "avg_hash_time_us": 2.248261853636041
+  }
+]

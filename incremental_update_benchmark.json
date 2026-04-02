@@ -1,0 +1,110 @@
+[
+  {
+    "method": "Full Recompute (Old)",
+    "algorithm": "BFS",
+    "runtime_ms": 4247.7887000422925,
+    "nodes_expanded": 5000,
+    "hash_computations": 75089,
+    "solution_found": false,
+    "avg_hash_time_us": 28.029901799661953
+  },
+  {
+    "method": "Incremental Update (New)",
+    "algorithm": "BFS",
+    "runtime_ms": 4168.210899922997,
+    "nodes_expanded": 5000,
+    "hash_computations": 71035,
+    "solution_found": false,
+    "avg_hash_time_us": 1.7352477007100355
+  },
+  {
+    "method": "Full Recompute (Old)",
+    "algorithm": "DFS",
+    "runtime_ms": 7675.9168999269605,
+    "nodes_expanded": 5000,
+    "hash_computations": 69144,
+    "solution_found": false,
+    "avg_hash_time_us": 28.93176098743909
+  },
+  {
+    "method": "Incremental Update (New)",
+    "algorithm": "DFS",
+    "runtime_ms": 6494.617799995467,
+    "nodes_expanded": 5000,
+    "hash_computations": 57702,
+    "solution_found": false,
+    "avg_hash_time_us": 2.0861685591927746
+  },
+  {
+    "method": "Full Recompute (Old)",
+    "algorithm": "BFS",
+    "runtime_ms": 1726.7573999706656,
+    "nodes_expanded": 5000,
+    "hash_computations": 31214,
+    "solution_found": false,
+    "avg_hash_time_us": 29.376478780529084
+  },
+  {
+    "method": "Incremental Update (New)",
+    "algorithm": "BFS",
+    "runtime_ms": 1609.126799972728,
+    "nodes_expanded": 5000,
+    "hash_computations": 22476,
+    "solution_found": false,
+    "avg_hash_time_us": 1.8230780799516655
+  },
+  {
+    "method": "Full Recompute (Old)",
+    "algorithm": "DFS",
+    "runtime_ms": 1077.0851999986917,
+    "nodes_expanded": 5000,
+    "hash_computations": 16879,
+    "solution_found": false,
+    "avg_hash_time_us": 31.01517711682472
+  },
+  {
+    "method": "Incremental Update (New)",
+    "algorithm": "DFS",
+    "runtime_ms": 917.5112000666559,
+    "nodes_expanded": 5000,
+    "hash_computations": 11155,
+    "solution_found": false,
+    "avg_hash_time_us": 1.8449111560677691
+  },
+  {
+    "method": "Full Recompute (Old)",
+    "algorithm": "BFS",
+    "runtime_ms": 2781.827599974349,
+    "nodes_expanded": 5000,
+    "hash_computations": 48549,
+    "solution_found": false,
+    "avg_hash_time_us": 30.54101635224505
+  },
+  {
+    "method": "Incremental Update (New)",
+    "algorithm": "BFS",
+    "runtime_ms": 2828.7721001543105,
+    "nodes_expanded": 5000,
+    "hash_computations": 40497,
+    "solution_found": false,
+    "avg_hash_time_us": 1.8869246013460153
+  },
+  {
+    "method": "Full Recompute (Old)",
+    "algorithm": "DFS",
+    "runtime_ms": 6087.264300091192,
+    "nodes_expanded": 5000,
+    "hash_computations": 59153,
+    "solution_found": false,
+    "avg_hash_time_us": 32.76612425290599
+  },
+  {
+    "method": "Incremental Update (New)",
+    "algorithm": "DFS",
+    "runtime_ms": 3487.4726000707597,
+    "nodes_expanded": 5000,
+    "hash_computations": 40285,
+    "solution_found": false,
+    "avg_hash_time_us": 1.9097800123953443
+  }
+]
