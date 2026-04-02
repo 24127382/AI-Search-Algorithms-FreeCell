@@ -1,0 +1,27 @@
+{
+  "deal": 42,
+  "parameters": {
+    "max_frontier": 5000,
+    "max_expanded_nodes": 10000,
+    "max_time_seconds": 10.0,
+    "log_interval": 500
+  },
+  "bfs": {
+    "stop_reason": "max_frontier_size_exceeded",
+    "elapsed_time": 1.8193,
+    "solution_found": false,
+    "solution_length": -1,
+    "total_nodes_expanded": 7805,
+    "final_frontier_size": 5001,
+    "log_file": "experiment_logs/bfs_deal42.json"
+  },
+  "dfs": {
+    "stop_reason": "goal_found",
+    "elapsed_time": 0.2014,
+    "solution_found": true,
+    "solution_length": 300,
+    "total_nodes_expanded": 520,
+    "final_frontier_size": 2751,
+    "log_file": "experiment_logs/dfs_deal42.json"
+  }
+}
