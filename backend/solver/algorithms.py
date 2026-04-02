@@ -1,10 +1,20 @@
 """Backward-compatible SearchAlgorithm facade."""
 
+from typing import Callable
+
 from backend.solver.astar import AStarAlgorithm
 from backend.solver.bfs import BFSAlgorithm
 from backend.solver.dfs import DFSAlgorithm
-from backend.solver.heuristics import combined_heuristic, foundation_distance, buried_cards, zero_heuristic
-from backend.solver.ucs.ucs import UCSAlgorithm
+from backend.solver.ucs import UCSAlgorithm
+from backend.solver.utils.heuristics import (
+    buried_cards,
+    combined_heuristic,
+    foundation_distance,
+    zero_heuristic,
+)
+
+SUPPORTED_SOLVER_ALGORITHMS = ("BFS", "DFS", "UCS", "A*")
+
 
 class SearchAlgorithm:
     """Small facade that dispatches to concrete search implementations."""
@@ -18,11 +28,19 @@ class SearchAlgorithm:
         """
         self.game_state = game_state
         self.should_cancel = should_cancel or (lambda: False)
-        self._handlers = {
-            "BFS": BFSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "DFS": DFSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "UCS": UCSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "A*": AStarAlgorithm(self.game_state,weight=5.0, should_cancel=self.should_cancel).search,
+        self._factories: dict[str, Callable[[], object]] = {
+            "BFS": lambda: BFSAlgorithm(
+                self.game_state, should_cancel=self.should_cancel
+            ),
+            "DFS": lambda: DFSAlgorithm(
+                self.game_state, should_cancel=self.should_cancel
+            ),
+            "UCS": lambda: UCSAlgorithm(
+                self.game_state, should_cancel=self.should_cancel
+            ),
+            "A*": lambda: AStarAlgorithm(
+                self.game_state, should_cancel=self.should_cancel
+            ),
         }
 
     def search(self, algorithm, heuristic_func=combined_heuristic):
@@ -38,9 +56,10 @@ class SearchAlgorithm:
         Raises:
             ValueError: If `algorithm` key is unsupported.
         """
-        handler = self._handlers.get(algorithm)
-        if handler is None:
+        if algorithm not in SUPPORTED_SOLVER_ALGORITHMS:
             raise ValueError(f"Unknown algorithm: {algorithm}")
+
+        solver = self._factories[algorithm]()
         if algorithm == "A*":
-            return handler(heuristic_func)
-        return handler()
+            return solver.search(heuristic_func)
+        return solver.search()

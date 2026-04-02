@@ -1,153 +1,471 @@
-"""Depth-First Search solver with incremental Zobrist hashing.
+"""Depth-First Search solver and DFS optimization toolkit.
 
-Uses Zobrist hashing for visited state detection, providing O(1) hash lookups
-and compact 64-bit hash values instead of storing full state objects.
-
-OPTIMIZATION: Now uses true incremental updates via update_move() for ~20x 
-faster hash computation compared to full recomputation.
+This module provides:
+- Single-profile DFS with path-arena parent pointers.
+- K-step cycle pruning.
+- Progressive widening with conservative defaults.
+- Optional move canonicalization (state canonicalization remains primary).
+- Optional delayed duplicate detection (default off; enable only after profiling).
 """
 
-from backend.engine.engine import apply_move, get_valid_moves
-from backend.solver.utils import get_zobrist_table, ZobristHash, ZobristTranscoder
+from __future__ import annotations
 
+from time import perf_counter
+from typing import Callable, List, Optional
 
-DFS_RUNTIME_LOG_ENABLED = os.environ.get("DFS_RUNTIME_LOG", "1") != "0"
+from backend.engine.engine import apply_move_with_forced, get_valid_moves
+from backend.experiments.solver_stats import SolverStats
+from backend.solver.search_utils.dfs_utils import (
+    accept_candidate,
+    allowed_children_count,
+    build_full_solution_path,
+    default_hard_time_cap_ms,
+    default_improvement_budget_ms,
+    edge_signature,
+    flush_pending_candidates,
+    has_best_solution,
+)
+from backend.solver.search_utils.dfs_utils import (
+    runtime_log_enabled as dfs_runtime_log_enabled,
+)
+from backend.solver.search_utils.search_profile import DFSProfile
+from backend.solver.utils.utility import state_key
+
 
 class DFSAlgorithm:
-    """Depth-First Search with incremental Zobrist hashing.
-    
-    Maintains incremental zobrist hash for each state visited, enabling efficient
-    transposition detection and state deduplication with O(1) hash updates.
-    """
+    """Depth-First Search solver with optimization profiles."""
 
-    def __init__(self, game_state):
-        """Initialize DFS solver.
-
-        Args:
-            game_state: Initial board state.
-            should_cancel: Optional callable returning True when solve should stop.
-        """
+    def __init__(
+        self,
+        game_state,
+        should_cancel: Optional[Callable] = None,
+        profile: Optional[DFSProfile] = None,
+        improvement_budget_ms: Optional[float] = None,
+        hard_time_cap_ms: Optional[float] = None,
+        runtime_log_enabled: Optional[bool] = None,
+    ):
         self.game_state = game_state
-        self.zobrist_table = get_zobrist_table()
+        self.should_cancel = should_cancel or (lambda: False)
+        self.profile = profile or DFSProfile.from_env()
+        self.improvement_budget_ms = (
+            default_improvement_budget_ms()
+            if improvement_budget_ms is None
+            else max(0.0, float(improvement_budget_ms))
+        )
+        self.hard_time_cap_ms = (
+            default_hard_time_cap_ms()
+            if hard_time_cap_ms is None
+            else max(1.0, float(hard_time_cap_ms))
+        )
+        self.runtime_log_enabled = (
+            dfs_runtime_log_enabled()
+            if runtime_log_enabled is None
+            else bool(runtime_log_enabled)
+        )
+        self.last_run_stats = None
 
-    def _extract_move_details(self, state, move, new_state):
-        """Extract source and destination details from a move.
-        
-        Args:
-            state: Source state
-            move: Move object
-            new_state: Destination state
-        
-        Returns:
-            tuple: (card, from_params, to_params) or None if extraction fails
-        """
-        try:
-            from_type, from_idx = move.from_pos
-            to_type, to_idx = move.to_pos
-            card = move.card
-            
-            # Build from/to parameters for update_move()
-            from_params = {}
-            to_params = {}
-            
-            if from_type == "tableau":
-                from_params = {"from_column": from_idx, "from_depth": len(state.tableau[from_idx]) - 1}
-            elif from_type == "freecell":
-                from_params = {"from_freecell": from_idx}
-            elif from_type == "foundation":
-                from_params = {"from_foundation": move.card.suit}
-            
-            if to_type == "tableau":
-                to_params = {"to_column": to_idx, "to_depth": len(new_state.tableau[to_idx]) - 1}
-            elif to_type == "freecell":
-                to_params = {"to_freecell": to_idx}
-            elif to_type == "foundation":
-                to_params = {"to_foundation": move.card.suit}
-            
-            return card, from_params, to_params
-        except (IndexError, AttributeError):
-            return None
+        # Backward-compatible public fields.
+        self.expanded_nodes = 0
+        self.peak_stack_size = 0
+        self.execution_time_ms = 0.0
 
-    def search(self):
-        """Execute DFS search using incremental Zobrist hashing.
+    def search(
+        self,
+        prefix_moves: tuple = (),
+    ) -> Optional[List]:
+        """Run DFS with the current profile."""
+        started_at = perf_counter()
+        profile = self.profile
 
-        Uses a stack for LIFO exploration with incremental zobrist hash updates 
-        (O(1) per move) for efficient cycle detection. Hash-based deduplication 
-        is more memory-efficient than storing full state objects.
+        root_state = self.game_state
+        root_depth = len(prefix_moves)
+        root_key = state_key(root_state)
 
-        Returns:
-            list: Path of moves from initial to goal state, or None if unsolvable.
-        """
-        # Initialize with full hash computation once
-        initial_hasher = ZobristHash(self.zobrist_table)
-        initial_hash = initial_hasher.hash_state(self.game_state)
-        
-        # Stack contains (state, path_list, zobrist_hasher)
-        stack = [(self.game_state, [], initial_hasher)]
-        visited = set()
+        state_arena = [root_state]
+        parent_index_arena = [-1]
+        edge_moves_arena = [()]
+        depth_arena = [root_depth]
+        incoming_last_move_arena = [prefix_moves[-1] if prefix_moves else None]
+        if profile.k_cycle_steps > 0:
+            recent_hashes_arena = [tuple([root_key])]
+        else:
+            recent_hashes_arena = [()]
+
+        stack = [0]
+        best_depth_by_state = {root_key: root_depth}
+        best_solution_node_index = None
+        best_solution_parent_index = None
+        best_solution_edge_moves = ()
+        best_solution_len = float("inf")
+        first_solution_at_ms = None
 
         self.expanded_nodes = 0
         self.peak_stack_size = 0
 
-        stats = {
-            "expanded_nodes": 0,
-            "generated_nodes": 0,
-            "stale_stack_pops": 0,
-            "pruned_by_visited": 0,
-            "peak_frontier_size": 1,
-            "peak_visited_size": 0,
-            "solution_length": 0,
-        }
+        stats = SolverStats.dfs_defaults(profile.delayed_duplicate_detection)
 
         while stack:
-            state, path, state_hasher = stack.pop()
-            state_hash = state_hasher.get_hash()
+            elapsed_ms = (perf_counter() - started_at) * 1000
+            if elapsed_ms >= self.hard_time_cap_ms:
+                stats["timed_out"] = True
+                stats["stop_reason"] = "hard_time_cap"
+                if has_best_solution(
+                    best_solution_node_index, best_solution_parent_index
+                ):
+                    full_path = build_full_solution_path(
+                        prefix_moves,
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        parent_index_arena,
+                        edge_moves_arena,
+                    )
+                    if full_path is not None:
+                        if stats["stop_reason"] == "running":
+                            stats["stop_reason"] = "solved"
+                        stats["solution_length"] = len(full_path)
+                        stats["final_frontier_size"] = len(stack)
+                        stats["final_visited_size"] = len(best_depth_by_state)
+                        self.last_run_stats = SolverStats.finalize_dfs(
+                            stats, started_at, solution_found=True
+                        )
+                        self.execution_time_ms = stats["elapsed_ms"]
+                        self.expanded_nodes = stats.get("expanded_nodes", 0)
+                        self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                        if self.runtime_log_enabled:
+                            print(SolverStats.format_dfs(self.last_run_stats))
+                        return full_path
 
-            if state_hash in visited:
+                stats["solution_length"] = 0
+                stats["final_frontier_size"] = len(stack)
+                stats["final_visited_size"] = len(best_depth_by_state)
+                self.last_run_stats = SolverStats.finalize_dfs(
+                    stats, started_at, solution_found=False
+                )
+                self.execution_time_ms = stats["elapsed_ms"]
+                self.expanded_nodes = stats.get("expanded_nodes", 0)
+                self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                if self.runtime_log_enabled:
+                    print(SolverStats.format_dfs(self.last_run_stats))
+                return None
+
+            if self.should_cancel():
+                if has_best_solution(
+                    best_solution_node_index, best_solution_parent_index
+                ):
+                    stats["stop_reason"] = "cancelled_with_best"
+                    full_path = build_full_solution_path(
+                        prefix_moves,
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        parent_index_arena,
+                        edge_moves_arena,
+                    )
+                    if full_path is not None:
+                        stats["solution_length"] = len(full_path)
+                        stats["final_frontier_size"] = len(stack)
+                        stats["final_visited_size"] = len(best_depth_by_state)
+                        self.last_run_stats = SolverStats.finalize_dfs(
+                            stats, started_at, solution_found=True
+                        )
+                        self.execution_time_ms = stats["elapsed_ms"]
+                        self.expanded_nodes = stats.get("expanded_nodes", 0)
+                        self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                        if self.runtime_log_enabled:
+                            print(SolverStats.format_dfs(self.last_run_stats))
+                        return full_path
+
+                stats["solution_length"] = 0
+                stats["stop_reason"] = "cancelled"
+                stats["final_frontier_size"] = len(stack)
+                stats["final_visited_size"] = len(best_depth_by_state)
+                self.last_run_stats = SolverStats.finalize_dfs(
+                    stats, started_at, solution_found=False
+                )
+                self.execution_time_ms = stats["elapsed_ms"]
+                self.expanded_nodes = stats.get("expanded_nodes", 0)
+                self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                if self.runtime_log_enabled:
+                    print(SolverStats.format_dfs(self.last_run_stats))
+                return None
+
+            if (
+                has_best_solution(best_solution_node_index, best_solution_parent_index)
+                and first_solution_at_ms is not None
+            ):
+                elapsed_ms = (perf_counter() - started_at) * 1000
+                if elapsed_ms - first_solution_at_ms >= self.improvement_budget_ms:
+                    stats["stop_reason"] = "improvement_budget_exhausted"
+                    full_path = build_full_solution_path(
+                        prefix_moves,
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        parent_index_arena,
+                        edge_moves_arena,
+                    )
+                    if full_path is not None:
+                        stats["solution_length"] = len(full_path)
+                        stats["final_frontier_size"] = len(stack)
+                        stats["final_visited_size"] = len(best_depth_by_state)
+                        self.last_run_stats = SolverStats.finalize_dfs(
+                            stats, started_at, solution_found=True
+                        )
+                        self.execution_time_ms = stats["elapsed_ms"]
+                        self.expanded_nodes = stats.get("expanded_nodes", 0)
+                        self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                        if self.runtime_log_enabled:
+                            print(SolverStats.format_dfs(self.last_run_stats))
+                        return full_path
+
+            if len(stack) > stats["peak_frontier_size"]:
+                stats["peak_frontier_size"] = len(stack)
+            if len(best_depth_by_state) > stats["peak_visited_size"]:
+                stats["peak_visited_size"] = len(best_depth_by_state)
+
+            node_index = stack.pop()
+            state = state_arena[node_index]
+            current_key = state_key(state)
+            node_depth = depth_arena[node_index]
+            last_move = incoming_last_move_arena[node_index]
+
+            if node_depth >= best_solution_len:
+                stats["pruned_by_bound"] += 1
+                continue
+
+            best_known_depth = best_depth_by_state.get(current_key)
+            if best_known_depth is not None and node_depth > best_known_depth:
                 stats["stale_stack_pops"] += 1
                 continue
 
-            visited.add(state_hash)
             stats["expanded_nodes"] += 1
 
             if state.is_goal:
-                stats["solution_length"] = len(path)
-                stats["final_frontier_size"] = len(stack)
-                stats["final_visited_size"] = len(visited)
-                self._finalize_stats(stats, started_at, solution_found=True)
-                if DFS_RUNTIME_LOG_ENABLED:
-                    self._log_progress()
-                return path
+                if node_depth < best_solution_len:
+                    best_solution_node_index = node_index
+                    best_solution_parent_index = None
+                    best_solution_edge_moves = ()
+                    best_solution_len = node_depth
+                    stats["best_solution_updates"] += 1
+                    stats["solution_length"] = node_depth
+                    if first_solution_at_ms is None:
+                        first_solution_at_ms = (perf_counter() - started_at) * 1000
+                continue
 
-            valid_moves = get_valid_moves(state)
+            valid_moves = get_valid_moves(
+                state,
+                last_move=last_move,
+                prune_canonical_redundant=True,
+            )
+            allowed_count = allowed_children_count(
+                node_depth, len(valid_moves), profile
+            )
+            if allowed_count < len(valid_moves):
+                stats["pruned_by_widening"] += len(valid_moves) - allowed_count
+            valid_moves = valid_moves[:allowed_count]
 
-            for move in valid_moves:
+            seen_edge_signatures = set()
+            pending = []
+            insertion_order = 0
+
+            for move in reversed(valid_moves):
                 if self.should_cancel():
+                    if has_best_solution(
+                        best_solution_node_index, best_solution_parent_index
+                    ):
+                        stats["stop_reason"] = "cancelled_with_best"
+                        full_path = build_full_solution_path(
+                            prefix_moves,
+                            best_solution_node_index,
+                            best_solution_parent_index,
+                            best_solution_edge_moves,
+                            parent_index_arena,
+                            edge_moves_arena,
+                        )
+                        if full_path is not None:
+                            stats["solution_length"] = len(full_path)
+                            stats["final_frontier_size"] = len(stack)
+                            stats["final_visited_size"] = len(best_depth_by_state)
+                            self.last_run_stats = SolverStats.finalize_dfs(
+                                stats, started_at, solution_found=True
+                            )
+                            self.execution_time_ms = stats["elapsed_ms"]
+                            self.expanded_nodes = stats.get("expanded_nodes", 0)
+                            self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                            if self.runtime_log_enabled:
+                                print(SolverStats.format_dfs(self.last_run_stats))
+                            return full_path
+
+                    stats["solution_length"] = 0
+                    stats["stop_reason"] = "cancelled"
+                    stats["final_frontier_size"] = len(stack)
+                    stats["final_visited_size"] = len(best_depth_by_state)
+                    self.last_run_stats = SolverStats.finalize_dfs(
+                        stats, started_at, solution_found=False
+                    )
+                    self.execution_time_ms = stats["elapsed_ms"]
+                    self.expanded_nodes = stats.get("expanded_nodes", 0)
+                    self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                    if self.runtime_log_enabled:
+                        print(SolverStats.format_dfs(self.last_run_stats))
                     return None
 
-                new_state = apply_move(state, move)
-                
-                # Use incremental update instead of full recomputation
-                new_hasher = ZobristHash(self.zobrist_table)
-                new_hasher.hash_state(state)  # Initialize from current state
-                
-                # Try to use incremental update
-                move_details = self._extract_move_details(state, move, new_state)
-                if move_details:
-                    card, from_params, to_params = move_details
-                    new_hasher.update_move(card, **from_params, **to_params)
+                new_state, forced_moves = apply_move_with_forced(state, move)
+                edge_moves = (move, *forced_moves)
+                next_depth = node_depth + len(edge_moves)
+                stats["generated_nodes"] += 1
+
+                if next_depth >= best_solution_len:
+                    stats["pruned_by_bound"] += 1
+                    continue
+
+                new_state_key = state_key(new_state)
+
+                if profile.k_cycle_steps > 0:
+                    recent = recent_hashes_arena[node_index]
+                    if new_state_key in recent:
+                        stats["pruned_by_cycle"] += 1
+                        continue
+
+                if profile.move_canonicalization:
+                    signature = edge_signature(edge_moves)
+                    if signature in seen_edge_signatures:
+                        stats["pruned_by_canonical"] += 1
+                        continue
+                    seen_edge_signatures.add(signature)
+
+                candidate = {
+                    "order": insertion_order,
+                    "state": new_state,
+                    "state_hash": new_state_key,
+                    "depth": next_depth,
+                    "edge_moves": edge_moves,
+                    "is_goal": bool(new_state.is_goal),
+                }
+                insertion_order += 1
+
+                if profile.delayed_duplicate_detection:
+                    pending.append(candidate)
+                    if len(pending) >= profile.delayed_duplicate_batch_size:
+                        for item in flush_pending_candidates(pending, stats):
+                            (
+                                best_solution_node_index,
+                                best_solution_parent_index,
+                                best_solution_edge_moves,
+                                best_solution_len,
+                                first_solution_at_ms,
+                            ) = accept_candidate(
+                                item,
+                                node_index,
+                                profile,
+                                started_at,
+                                best_depth_by_state,
+                                stats,
+                                state_arena,
+                                parent_index_arena,
+                                edge_moves_arena,
+                                depth_arena,
+                                incoming_last_move_arena,
+                                recent_hashes_arena,
+                                stack,
+                                best_solution_node_index,
+                                best_solution_parent_index,
+                                best_solution_edge_moves,
+                                best_solution_len,
+                                first_solution_at_ms,
+                            )
                 else:
-                    # Fallback to full hash if move extraction fails
-                    new_hasher = ZobristHash(self.zobrist_table)
-                    new_hasher.hash_state(new_state)
+                    (
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        best_solution_len,
+                        first_solution_at_ms,
+                    ) = accept_candidate(
+                        candidate,
+                        node_index,
+                        profile,
+                        started_at,
+                        best_depth_by_state,
+                        stats,
+                        state_arena,
+                        parent_index_arena,
+                        edge_moves_arena,
+                        depth_arena,
+                        incoming_last_move_arena,
+                        recent_hashes_arena,
+                        stack,
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        best_solution_len,
+                        first_solution_at_ms,
+                    )
 
-                new_hash = new_hasher.get_hash()
-                if new_hash not in visited:
-                    stack.append((new_state, path + [move], new_hasher))
+            if profile.delayed_duplicate_detection:
+                for item in flush_pending_candidates(pending, stats):
+                    (
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        best_solution_len,
+                        first_solution_at_ms,
+                    ) = accept_candidate(
+                        item,
+                        node_index,
+                        profile,
+                        started_at,
+                        best_depth_by_state,
+                        stats,
+                        state_arena,
+                        parent_index_arena,
+                        edge_moves_arena,
+                        depth_arena,
+                        incoming_last_move_arena,
+                        recent_hashes_arena,
+                        stack,
+                        best_solution_node_index,
+                        best_solution_parent_index,
+                        best_solution_edge_moves,
+                        best_solution_len,
+                        first_solution_at_ms,
+                    )
 
+        if has_best_solution(best_solution_node_index, best_solution_parent_index):
+            stats["stop_reason"] = "exhausted_with_solution"
+            full_path = build_full_solution_path(
+                prefix_moves,
+                best_solution_node_index,
+                best_solution_parent_index,
+                best_solution_edge_moves,
+                parent_index_arena,
+                edge_moves_arena,
+            )
+            if full_path is not None:
+                stats["solution_length"] = len(full_path)
+                stats["final_frontier_size"] = len(stack)
+                stats["final_visited_size"] = len(best_depth_by_state)
+                self.last_run_stats = SolverStats.finalize_dfs(
+                    stats, started_at, solution_found=True
+                )
+                self.execution_time_ms = stats["elapsed_ms"]
+                self.expanded_nodes = stats.get("expanded_nodes", 0)
+                self.peak_stack_size = stats.get("peak_frontier_size", 0)
+                if self.runtime_log_enabled:
+                    print(SolverStats.format_dfs(self.last_run_stats))
+                return full_path
+
+        stats["solution_length"] = 0
+        stats["stop_reason"] = "exhausted_no_solution"
         stats["final_frontier_size"] = len(stack)
-        stats["final_visited_size"] = len(visited)
-        self._finalize_stats(stats, started_at, solution_found=False)
-        if DFS_RUNTIME_LOG_ENABLED:
-            self._log_progress()
+        stats["final_visited_size"] = len(best_depth_by_state)
+        self.last_run_stats = SolverStats.finalize_dfs(
+            stats, started_at, solution_found=False
+        )
+        self.execution_time_ms = stats["elapsed_ms"]
+        self.expanded_nodes = stats.get("expanded_nodes", 0)
+        self.peak_stack_size = stats.get("peak_frontier_size", 0)
+        if self.runtime_log_enabled:
+            print(SolverStats.format_dfs(self.last_run_stats))
         return None
