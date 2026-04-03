@@ -8,9 +8,12 @@ faster hash computation compared to full recomputation.
 """
 
 import os
+import time
 from collections import deque
 from backend.engine.engine import apply_move, get_valid_moves
 from backend.solver.utils import get_zobrist_table, ZobristHash, ZobristTranscoder
+
+BFS_RUNTIME_LOG_ENABLED = False
 
 
 class BFSAlgorithm:
@@ -81,6 +84,8 @@ class BFSAlgorithm:
         Returns:
             list: Shortest path of moves from initial to goal state, or None if unsolvable.
         """
+        started_at = time.time()
+        
         # Initialize with full hash computation once
         initial_hasher = ZobristHash(self.zobrist_table)
         initial_hash = initial_hasher.hash_state(self.game_state)
