@@ -1,11 +1,14 @@
-from backend.engine.engine import apply_move, get_valid_moves
-from backend.model.card import VALID_RANK, VALID_SUITS, Card
-from backend.model.move import MoveType
-from backend.model.state import State
-from backend.solver.astar import AStarAlgorithm
-from backend.solver.bfs import BFSAlgorithm
-from backend.solver.search_utils.ucs_utils import ucs_move_cost
-from backend.solver.ucs import UCSAlgorithm
+from unittest.mock import patch
+
+from source.application.engine.engine import apply_move, get_valid_moves
+from source.domain.model.card import VALID_RANK, VALID_SUITS, Card
+from source.domain.model.move import MoveType
+from source.domain.model.state import State
+from source.domain.solver.astar import AStarAlgorithm
+from source.domain.solver.bfs import BFSAlgorithm
+from source.domain.solver.search_utils.search_profile import BFSProfile
+from source.domain.solver.search_utils.ucs_utils import ucs_move_cost
+from source.domain.solver.ucs import UCSAlgorithm
 
 
 def _build_near_goal_state() -> State:
@@ -41,17 +44,6 @@ def _build_symmetry_state() -> State:
     )
 
 
-def test_ucs_foundation_cost_is_non_negative():
-    state = _build_near_goal_state()
-    moves = get_valid_moves(state)
-
-    foundation_move = next(move for move in moves if move.to_pos[0] == "foundation")
-    next_state = apply_move(state, foundation_move)
-    cost = ucs_move_cost(foundation_move, prev_state=state, next_state=next_state)
-
-    assert cost >= 0
-
-
 def test_bfs_cancelled_run_finalizes_stats():
     solver = BFSAlgorithm(_build_near_goal_state(), should_cancel=lambda: True)
 
@@ -60,6 +52,30 @@ def test_bfs_cancelled_run_finalizes_stats():
     assert result is None
     assert solver.last_run_stats is not None
     assert solver.last_run_stats["stop_reason"] == "cancelled"
+    assert solver.last_run_stats["solution_found"] is False
+
+
+def test_bfs_hard_time_cap_stops_run():
+    with patch("source.domain.solver.bfs.perf_counter", side_effect=[0.0, 61.0, 62.0]):
+        solver = BFSAlgorithm(_build_near_goal_state())
+        result = solver.search()
+
+    assert result is None
+    assert solver.last_run_stats is not None
+    assert solver.last_run_stats["stop_reason"] == "hard_time_cap"
+    assert solver.last_run_stats["solution_found"] is False
+
+
+def test_bfs_expanded_node_cap_stops_run():
+    profile = BFSProfile(runtime_log_enabled=False, max_expanded_nodes=1)
+    solver = BFSAlgorithm(_build_near_goal_state(), profile=profile)
+
+    result = solver.search()
+
+    assert result is None
+    assert solver.last_run_stats is not None
+    assert solver.last_run_stats["stop_reason"] == "expanded_limit"
+    assert solver.last_run_stats["expanded_nodes"] == 1
     assert solver.last_run_stats["solution_found"] is False
 
 

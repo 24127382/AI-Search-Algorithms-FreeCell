@@ -1,6 +1,6 @@
 """Logic-faithful benchmark: packed vs unpacked state keys.
 
-This script benchmarks the real solver implementations from backend/solver
+This script benchmarks the real solver implementations from freecell.domain.solver
 instead of re-implementing search loops. It only injects minimal hooks for:
 - expansion/time limits
 - packed vs unpacked state-key mode switching
@@ -25,18 +25,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import backend.solver.astar as astar_module
-import backend.solver.bfs as bfs_module
-import backend.solver.dfs as dfs_module
-import backend.solver.search_utils.ucs_utils as ucs_utils
-import backend.solver.ucs as ucs_module
-from backend.engine.shuffle import deal_by_game_number
-from backend.model.state import State
-from backend.solver.astar import AStarAlgorithm
-from backend.solver.bfs import BFSAlgorithm
-from backend.solver.dfs import DFSAlgorithm
-from backend.solver.ucs import UCSAlgorithm
-from backend.solver.utils.heuristics import combined_heuristic
+import source.domain.solver.astar as astar_module
+import source.domain.solver.bfs as bfs_module
+import source.domain.solver.dfs as dfs_module
+import source.domain.solver.search_utils.ucs_utils as ucs_utils
+import source.domain.solver.ucs as ucs_module
+from source.application.engine.shuffle import deal_by_game_number
+from source.domain.model.state import State
+from source.domain.solver.astar import AStarAlgorithm
+from source.domain.solver.bfs import BFSAlgorithm
+from source.domain.solver.dfs import DFSAlgorithm
+from source.domain.solver.ucs import UCSAlgorithm
+from source.domain.solver.utils.heuristics import combined_heuristic
 
 PACKED_MODE = "packed"
 UNPACKED_MODE = "unpacked"

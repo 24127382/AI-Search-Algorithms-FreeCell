@@ -1,8 +1,8 @@
-from backend.experiments.solver_stats import SolverStats
-from backend.model.card import VALID_RANK, VALID_SUITS, Card
-from backend.model.state import State
-from backend.solver.bfs import BFSAlgorithm
-from backend.solver.dfs import DFSAlgorithm
+from source.application.experiments.solver_stats import SolverStats
+from source.domain.model.card import VALID_RANK, VALID_SUITS, Card
+from source.domain.model.state import State
+from source.domain.solver.bfs import BFSAlgorithm
+from source.domain.solver.dfs import DFSAlgorithm
 
 
 def _build_near_goal_state() -> State:
