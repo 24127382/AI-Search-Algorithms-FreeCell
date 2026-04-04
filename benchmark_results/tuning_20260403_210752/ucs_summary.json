@@ -1,0 +1,41 @@
+[
+  {
+    "foundation_move_cost": -5,
+    "cases": 10,
+    "solved": 2,
+    "timeouts": 8,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 4213.150050000877,
+    "median_elapsed_ms_solved": 4213.150050000877,
+    "mean_solution_length": 74.0,
+    "common_with_baseline": 2,
+    "speedup_vs_baseline_x": 1.0,
+    "solution_length_delta_vs_baseline": 0.0
+  },
+  {
+    "foundation_move_cost": -100,
+    "cases": 10,
+    "solved": 7,
+    "timeouts": 3,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 848.6721714283964,
+    "median_elapsed_ms_solved": 982.1444000008341,
+    "mean_solution_length": 87.0,
+    "common_with_baseline": 2,
+    "speedup_vs_baseline_x": 15.290731160304647,
+    "solution_length_delta_vs_baseline": 5.5
+  },
+  {
+    "foundation_move_cost": -1000,
+    "cases": 10,
+    "solved": 7,
+    "timeouts": 3,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 850.5871428569662,
+    "median_elapsed_ms_solved": 974.2409999998927,
+    "mean_solution_length": 87.0,
+    "common_with_baseline": 2,
+    "speedup_vs_baseline_x": 15.391954464458479,
+    "solution_length_delta_vs_baseline": 5.5
+  }
+]

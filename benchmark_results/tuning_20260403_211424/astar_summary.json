@@ -1,0 +1,72 @@
+[
+  {
+    "heuristic": "zero_heuristic",
+    "cases": 10,
+    "solved": 7,
+    "timeouts": 3,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 814.4859142856668,
+    "median_elapsed_ms_solved": 998.4722999997757,
+    "mean_solution_length": 87.0,
+    "common_with_baseline": 7,
+    "speedup_vs_combined_x": 1.023404988379259,
+    "solution_length_delta_vs_combined": 0.0,
+    "admissibility_violation_witnesses": 7
+  },
+  {
+    "heuristic": "foundation_distance",
+    "cases": 10,
+    "solved": 7,
+    "timeouts": 3,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 828.4993571430407,
+    "median_elapsed_ms_solved": 1029.1393999996217,
+    "mean_solution_length": 87.0,
+    "common_with_baseline": 7,
+    "speedup_vs_combined_x": 1.0105536487839069,
+    "solution_length_delta_vs_combined": 0.0,
+    "admissibility_violation_witnesses": 7
+  },
+  {
+    "heuristic": "buried_cards",
+    "cases": 10,
+    "solved": 8,
+    "timeouts": 2,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 1008.6436749998029,
+    "median_elapsed_ms_solved": 543.949199999588,
+    "mean_solution_length": 86.75,
+    "common_with_baseline": 7,
+    "speedup_vs_combined_x": 1.9662470664089429,
+    "solution_length_delta_vs_combined": 0.14285714285714285,
+    "admissibility_violation_witnesses": 8
+  },
+  {
+    "heuristic": "combined_heuristic",
+    "cases": 10,
+    "solved": 7,
+    "timeouts": 3,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 837.6165428573066,
+    "median_elapsed_ms_solved": 1048.20650000147,
+    "mean_solution_length": 87.0,
+    "common_with_baseline": 7,
+    "speedup_vs_combined_x": 1.0,
+    "solution_length_delta_vs_combined": 0.0,
+    "admissibility_violation_witnesses": 7
+  },
+  {
+    "heuristic": "progress_pressure_heuristic",
+    "cases": 10,
+    "solved": 8,
+    "timeouts": 2,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 1724.9155500003326,
+    "median_elapsed_ms_solved": 908.347850001519,
+    "mean_solution_length": 85.875,
+    "common_with_baseline": 7,
+    "speedup_vs_combined_x": 1.2056936570201522,
+    "solution_length_delta_vs_combined": -1.0,
+    "admissibility_violation_witnesses": 8
+  }
+]

@@ -1,0 +1,185 @@
+{
+  "run": {
+    "start_deal": 1,
+    "end_deal": 100,
+    "timeout_seconds": 30.0,
+    "astar_weight": 5.0,
+    "ucs_foundation_costs": [
+      -20,
+      -100,
+      -400,
+      -1000
+    ],
+    "astar_heuristics": [
+      "zero_heuristic",
+      "foundation_distance",
+      "buried_cards",
+      "combined_heuristic",
+      "progress_pressure_heuristic"
+    ]
+  },
+  "selection": {
+    "astar_foundation_cost": -100
+  },
+  "ucs_summary": [
+    {
+      "foundation_move_cost": -20,
+      "cases": 100,
+      "solved": 93,
+      "timeouts": 7,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 2986.0647666666546,
+      "median_elapsed_ms_solved": 1072.2681999995984,
+      "mean_solution_length": 86.79569892473118,
+      "common_with_baseline": 93,
+      "speedup_vs_baseline_x": 1.0,
+      "solution_length_delta_vs_baseline": 0.0
+    },
+    {
+      "foundation_move_cost": -100,
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 2214.3224287233834,
+      "median_elapsed_ms_solved": 880.0033500001518,
+      "mean_solution_length": 90.36170212765957,
+      "common_with_baseline": 90,
+      "speedup_vs_baseline_x": 2.461545243460073,
+      "solution_length_delta_vs_baseline": 3.477777777777778
+    },
+    {
+      "foundation_move_cost": -400,
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 2294.7810382978632,
+      "median_elapsed_ms_solved": 974.0776000007827,
+      "mean_solution_length": 90.56382978723404,
+      "common_with_baseline": 90,
+      "speedup_vs_baseline_x": 2.348237933743361,
+      "solution_length_delta_vs_baseline": 3.6666666666666665
+    },
+    {
+      "foundation_move_cost": -1000,
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 2288.531652127626,
+      "median_elapsed_ms_solved": 988.5897499998464,
+      "mean_solution_length": 90.56382978723404,
+      "common_with_baseline": 90,
+      "speedup_vs_baseline_x": 2.330062041650563,
+      "solution_length_delta_vs_baseline": 3.6666666666666665
+    }
+  ],
+  "astar_summary": [
+    {
+      "heuristic": "zero_heuristic",
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1717.4129765958146,
+      "median_elapsed_ms_solved": 602.7215000003707,
+      "mean_solution_length": 90.43617021276596,
+      "common_with_baseline": 94,
+      "speedup_vs_combined_x": 1.2140554838847908,
+      "solution_length_delta_vs_combined": 0.0,
+      "admissibility_violation_witnesses": 94
+    },
+    {
+      "heuristic": "foundation_distance",
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1748.7508127659507,
+      "median_elapsed_ms_solved": 609.9976999994396,
+      "mean_solution_length": 90.43617021276596,
+      "common_with_baseline": 94,
+      "speedup_vs_combined_x": 1.204059657111699,
+      "solution_length_delta_vs_combined": 0.0,
+      "admissibility_violation_witnesses": 94
+    },
+    {
+      "heuristic": "buried_cards",
+      "cases": 100,
+      "solved": 95,
+      "timeouts": 5,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1304.1232957893571,
+      "median_elapsed_ms_solved": 427.0070000002306,
+      "mean_solution_length": 92.47368421052632,
+      "common_with_baseline": 94,
+      "speedup_vs_combined_x": 2.1527874964437856,
+      "solution_length_delta_vs_combined": 1.9680851063829787,
+      "admissibility_violation_witnesses": 95
+    },
+    {
+      "heuristic": "combined_heuristic",
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1916.0638095745717,
+      "median_elapsed_ms_solved": 673.7072500000068,
+      "mean_solution_length": 90.43617021276596,
+      "common_with_baseline": 94,
+      "speedup_vs_combined_x": 1.0,
+      "solution_length_delta_vs_combined": 0.0,
+      "admissibility_violation_witnesses": 94
+    },
+    {
+      "heuristic": "progress_pressure_heuristic",
+      "cases": 100,
+      "solved": 94,
+      "timeouts": 6,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1624.511971276506,
+      "median_elapsed_ms_solved": 733.3593499997733,
+      "mean_solution_length": 90.94680851063829,
+      "common_with_baseline": 93,
+      "speedup_vs_combined_x": 1.3083028093461742,
+      "solution_length_delta_vs_combined": 0.7204301075268817,
+      "admissibility_violation_witnesses": 94
+    }
+  ],
+  "astar_consistency": [
+    {
+      "heuristic": "buried_cards",
+      "consistency_checks": 16035,
+      "consistency_violations": 1196,
+      "consistency_violation_rate": 0.07458684128468974
+    },
+    {
+      "heuristic": "zero_heuristic",
+      "consistency_checks": 16035,
+      "consistency_violations": 1196,
+      "consistency_violation_rate": 0.07458684128468974
+    },
+    {
+      "heuristic": "foundation_distance",
+      "consistency_checks": 16035,
+      "consistency_violations": 1196,
+      "consistency_violation_rate": 0.07458684128468974
+    },
+    {
+      "heuristic": "combined_heuristic",
+      "consistency_checks": 16035,
+      "consistency_violations": 1196,
+      "consistency_violation_rate": 0.07458684128468974
+    },
+    {
+      "heuristic": "progress_pressure_heuristic",
+      "consistency_checks": 16035,
+      "consistency_violations": 1196,
+      "consistency_violation_rate": 0.07458684128468974
+    }
+  ],
+  "artifacts": {
+    "output_dir": "C:\\Users\\mduy\\source\\repos\\AI-Search-Algorithms-FreeCell\\benchmark_results\\tuning_20260403_211853"
+  }
+}

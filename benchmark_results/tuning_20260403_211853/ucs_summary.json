@@ -1,0 +1,54 @@
+[
+  {
+    "foundation_move_cost": -20,
+    "cases": 100,
+    "solved": 93,
+    "timeouts": 7,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 2986.0647666666546,
+    "median_elapsed_ms_solved": 1072.2681999995984,
+    "mean_solution_length": 86.79569892473118,
+    "common_with_baseline": 93,
+    "speedup_vs_baseline_x": 1.0,
+    "solution_length_delta_vs_baseline": 0.0
+  },
+  {
+    "foundation_move_cost": -100,
+    "cases": 100,
+    "solved": 94,
+    "timeouts": 6,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 2214.3224287233834,
+    "median_elapsed_ms_solved": 880.0033500001518,
+    "mean_solution_length": 90.36170212765957,
+    "common_with_baseline": 90,
+    "speedup_vs_baseline_x": 2.461545243460073,
+    "solution_length_delta_vs_baseline": 3.477777777777778
+  },
+  {
+    "foundation_move_cost": -400,
+    "cases": 100,
+    "solved": 94,
+    "timeouts": 6,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 2294.7810382978632,
+    "median_elapsed_ms_solved": 974.0776000007827,
+    "mean_solution_length": 90.56382978723404,
+    "common_with_baseline": 90,
+    "speedup_vs_baseline_x": 2.348237933743361,
+    "solution_length_delta_vs_baseline": 3.6666666666666665
+  },
+  {
+    "foundation_move_cost": -1000,
+    "cases": 100,
+    "solved": 94,
+    "timeouts": 6,
+    "unsolved_non_timeout": 0,
+    "mean_elapsed_ms_solved": 2288.531652127626,
+    "median_elapsed_ms_solved": 988.5897499998464,
+    "mean_solution_length": 90.56382978723404,
+    "common_with_baseline": 90,
+    "speedup_vs_baseline_x": 2.330062041650563,
+    "solution_length_delta_vs_baseline": 3.6666666666666665
+  }
+]

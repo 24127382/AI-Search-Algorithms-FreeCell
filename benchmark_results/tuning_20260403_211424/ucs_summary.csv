@@ -1,0 +1,4 @@
+cases,common_with_baseline,foundation_move_cost,mean_elapsed_ms_solved,mean_solution_length,median_elapsed_ms_solved,solution_length_delta_vs_baseline,solved,speedup_vs_baseline_x,timeouts,unsolved_non_timeout
+10,2,-5,4122.366649999094,74.0,4122.366649999094,0.0,2,1.0,8,0
+10,2,-100,830.0324285714202,87.0,937.0656000010058,5.5,7,14.824844868526867,3,0
+10,2,-1000,834.6383142860369,87.0,977.8707000004943,5.5,7,14.960807395913072,3,0

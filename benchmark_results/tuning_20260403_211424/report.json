@@ -1,0 +1,171 @@
+{
+  "run": {
+    "start_deal": 1,
+    "end_deal": 10,
+    "timeout_seconds": 10.0,
+    "astar_weight": 5.0,
+    "ucs_foundation_costs": [
+      -5,
+      -100,
+      -1000
+    ],
+    "astar_heuristics": [
+      "zero_heuristic",
+      "foundation_distance",
+      "buried_cards",
+      "combined_heuristic",
+      "progress_pressure_heuristic"
+    ]
+  },
+  "selection": {
+    "astar_foundation_cost": -100
+  },
+  "ucs_summary": [
+    {
+      "foundation_move_cost": -5,
+      "cases": 10,
+      "solved": 2,
+      "timeouts": 8,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 4122.366649999094,
+      "median_elapsed_ms_solved": 4122.366649999094,
+      "mean_solution_length": 74.0,
+      "common_with_baseline": 2,
+      "speedup_vs_baseline_x": 1.0,
+      "solution_length_delta_vs_baseline": 0.0
+    },
+    {
+      "foundation_move_cost": -100,
+      "cases": 10,
+      "solved": 7,
+      "timeouts": 3,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 830.0324285714202,
+      "median_elapsed_ms_solved": 937.0656000010058,
+      "mean_solution_length": 87.0,
+      "common_with_baseline": 2,
+      "speedup_vs_baseline_x": 14.824844868526867,
+      "solution_length_delta_vs_baseline": 5.5
+    },
+    {
+      "foundation_move_cost": -1000,
+      "cases": 10,
+      "solved": 7,
+      "timeouts": 3,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 834.6383142860369,
+      "median_elapsed_ms_solved": 977.8707000004943,
+      "mean_solution_length": 87.0,
+      "common_with_baseline": 2,
+      "speedup_vs_baseline_x": 14.960807395913072,
+      "solution_length_delta_vs_baseline": 5.5
+    }
+  ],
+  "astar_summary": [
+    {
+      "heuristic": "zero_heuristic",
+      "cases": 10,
+      "solved": 7,
+      "timeouts": 3,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 814.4859142856668,
+      "median_elapsed_ms_solved": 998.4722999997757,
+      "mean_solution_length": 87.0,
+      "common_with_baseline": 7,
+      "speedup_vs_combined_x": 1.023404988379259,
+      "solution_length_delta_vs_combined": 0.0,
+      "admissibility_violation_witnesses": 7
+    },
+    {
+      "heuristic": "foundation_distance",
+      "cases": 10,
+      "solved": 7,
+      "timeouts": 3,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 828.4993571430407,
+      "median_elapsed_ms_solved": 1029.1393999996217,
+      "mean_solution_length": 87.0,
+      "common_with_baseline": 7,
+      "speedup_vs_combined_x": 1.0105536487839069,
+      "solution_length_delta_vs_combined": 0.0,
+      "admissibility_violation_witnesses": 7
+    },
+    {
+      "heuristic": "buried_cards",
+      "cases": 10,
+      "solved": 8,
+      "timeouts": 2,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1008.6436749998029,
+      "median_elapsed_ms_solved": 543.949199999588,
+      "mean_solution_length": 86.75,
+      "common_with_baseline": 7,
+      "speedup_vs_combined_x": 1.9662470664089429,
+      "solution_length_delta_vs_combined": 0.14285714285714285,
+      "admissibility_violation_witnesses": 8
+    },
+    {
+      "heuristic": "combined_heuristic",
+      "cases": 10,
+      "solved": 7,
+      "timeouts": 3,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 837.6165428573066,
+      "median_elapsed_ms_solved": 1048.20650000147,
+      "mean_solution_length": 87.0,
+      "common_with_baseline": 7,
+      "speedup_vs_combined_x": 1.0,
+      "solution_length_delta_vs_combined": 0.0,
+      "admissibility_violation_witnesses": 7
+    },
+    {
+      "heuristic": "progress_pressure_heuristic",
+      "cases": 10,
+      "solved": 8,
+      "timeouts": 2,
+      "unsolved_non_timeout": 0,
+      "mean_elapsed_ms_solved": 1724.9155500003326,
+      "median_elapsed_ms_solved": 908.347850001519,
+      "mean_solution_length": 85.875,
+      "common_with_baseline": 7,
+      "speedup_vs_combined_x": 1.2056936570201522,
+      "solution_length_delta_vs_combined": -1.0,
+      "admissibility_violation_witnesses": 8
+    }
+  ],
+  "astar_consistency": [
+    {
+      "heuristic": "buried_cards",
+      "consistency_checks": 1711,
+      "consistency_violations": 95,
+      "consistency_violation_rate": 0.055523085914669784
+    },
+    {
+      "heuristic": "zero_heuristic",
+      "consistency_checks": 1711,
+      "consistency_violations": 95,
+      "consistency_violation_rate": 0.055523085914669784
+    },
+    {
+      "heuristic": "foundation_distance",
+      "consistency_checks": 1711,
+      "consistency_violations": 95,
+      "consistency_violation_rate": 0.055523085914669784
+    },
+    {
+      "heuristic": "combined_heuristic",
+      "consistency_checks": 1711,
+      "consistency_violations": 95,
+      "consistency_violation_rate": 0.055523085914669784
+    },
+    {
+      "heuristic": "progress_pressure_heuristic",
+      "consistency_checks": 1711,
+      "consistency_violations": 95,
+      "consistency_violation_rate": 0.055523085914669784
+    }
+  ],
+  "artifacts": {
+    "output_dir": "C:\\Users\\mduy\\source\\repos\\AI-Search-Algorithms-FreeCell\\benchmark_results\\tuning_20260403_211424"
+  }
+}

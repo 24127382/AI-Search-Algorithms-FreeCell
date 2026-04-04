@@ -1,0 +1,6 @@
+admissibility_violation_witnesses,cases,common_with_baseline,heuristic,mean_elapsed_ms_solved,mean_solution_length,median_elapsed_ms_solved,solution_length_delta_vs_combined,solved,speedup_vs_combined_x,timeouts,unsolved_non_timeout
+7,10,7,zero_heuristic,814.4859142856668,87.0,998.4722999997757,0.0,7,1.023404988379259,3,0
+7,10,7,foundation_distance,828.4993571430407,87.0,1029.1393999996217,0.0,7,1.0105536487839069,3,0
+8,10,7,buried_cards,1008.6436749998029,86.75,543.949199999588,0.14285714285714285,8,1.9662470664089429,2,0
+7,10,7,combined_heuristic,837.6165428573066,87.0,1048.20650000147,0.0,7,1.0,3,0
+8,10,7,progress_pressure_heuristic,1724.9155500003326,85.875,908.347850001519,-1.0,8,1.2056936570201522,2,0
