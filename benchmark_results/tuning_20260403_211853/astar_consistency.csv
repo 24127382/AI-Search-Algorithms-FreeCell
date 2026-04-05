@@ -1,6 +1,0 @@
-consistency_checks,consistency_violation_rate,consistency_violations,heuristic
-16035,0.07458684128468974,1196,buried_cards
-16035,0.07458684128468974,1196,zero_heuristic
-16035,0.07458684128468974,1196,foundation_distance
-16035,0.07458684128468974,1196,combined_heuristic
-16035,0.07458684128468974,1196,progress_pressure_heuristic
