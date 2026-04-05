@@ -1,22 +1,31 @@
 """Main application window and deal-number startup dialog."""
 
+from typing import Union
 from frontend.board.widget import BoardWidget
 from frontend.control_panel import ControlPanel
 from frontend.shared.qt import QDialog, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
 
+# Special test case IDs that are supported
+SPECIAL_TEST_CASE_IDS = {"bfs_easy_10", "bfs_hard_20"}
+
 
 class DealNumberDialog(QDialog):
-	"""Modal dialog that lets the player input an optional deal number."""
+	"""Modal dialog that lets the player input an optional deal number or special test case ID.
+	
+	Supports:
+	- Integer deal numbers (Microsoft deals): 1, 42, 999999999
+	- Special test case IDs: bfs_easy_10, bfs_hard_20
+	"""
 
-	def __init__(self, parent=None, initial_deal_number: int | None = None):
+	def __init__(self, parent=None, initial_deal_number: Union[int, str, None] = None):
 		"""Initialize dialog defaults and build input controls.
 
 		Args:
 			parent: Optional parent widget.
-			initial_deal_number: Optional value to prefill input.
+			initial_deal_number: Optional int (Microsoft deal) or str (special test case ID).
 		"""
 		super().__init__(parent)
-		self.selected_deal_number: int | None = initial_deal_number
+		self.selected_deal_number: Union[int, str, None] = initial_deal_number
 		self.setWindowTitle("Start Game")
 		self.setModal(True)
 		self.resize(460, 200)
@@ -59,15 +68,20 @@ class DealNumberDialog(QDialog):
 		layout.setContentsMargins(18, 16, 18, 16)
 		layout.setSpacing(12)
 
-		title = QLabel("Enter a Deal Number or leave empty for random")
+		title = QLabel("Enter a Deal Number, Test Case ID, or leave empty for random")
 		title.setStyleSheet("font-size: 13pt; font-weight: bold;")
 		layout.addWidget(title)
 
 		self._deal_input = QLineEdit()
-		self._deal_input.setPlaceholderText("Example: 1, -42, 999999999")
+		self._deal_input.setPlaceholderText("Examples: 42, bfs_easy_10, bfs_hard_20")
 		if self.selected_deal_number is not None:
 			self._deal_input.setText(str(self.selected_deal_number))
 		layout.addWidget(self._deal_input)
+
+		# Add help text showing available special test cases
+		help_text = QLabel("Special test cases: bfs_easy_10 (~10 moves), bfs_hard_20 (~20 moves)")
+		help_text.setStyleSheet("font-size: 9pt; color: #a8c8b0;")
+		layout.addWidget(help_text)
 
 		button_row = QHBoxLayout()
 		button_row.setSpacing(8)
@@ -89,14 +103,31 @@ class DealNumberDialog(QDialog):
 			self.accept()
 			return
 
+		# Try parsing as integer first
 		try:
 			deal_number = int(raw_value)
+			self.selected_deal_number = deal_number
+			self.accept()
+			return
 		except ValueError:
-			QMessageBox.warning(self, "Invalid Deal Number", "Deal number must be a valid integer.")
+			pass  # Try as special test case ID next
+
+		# Check if it's a valid special test case ID
+		if raw_value.lower() in SPECIAL_TEST_CASE_IDS:
+			self.selected_deal_number = raw_value.lower()
+			self.accept()
 			return
 
-		self.selected_deal_number = deal_number
-		self.accept()
+		# Invalid input
+		error_msg = (
+			f"Invalid input: '{raw_value}'\n\n"
+			f"Please enter:\n"
+			f"  • A valid integer (e.g., 42)\n"
+			f"  • A special test case: bfs_easy_10 or bfs_hard_20\n"
+			f"  • Leave empty for random deal"
+		)
+		QMessageBox.warning(self, "Invalid Deal Input", error_msg)
+		return
 
 
 class VictoryDialog(QDialog):
@@ -170,15 +201,15 @@ class VictoryDialog(QDialog):
 class MainWindow(QMainWindow):
 	"""Top-level container that hosts controls and the game board."""
 
-	def __init__(self, deal_number: int | None = None):
+	def __init__(self, deal_number: Union[int, str, None] = None):
 		"""Create main window with initialized board and control panel.
 
 		Args:
-			deal_number: Optional fixed deal number for board setup.
+			deal_number: Optional Microsoft deal number (int) or special test case ID (str).
 		"""
 		super().__init__()
-		self.selected_deal_number: int | None = deal_number
-		self.current_deal_number: int | None = None
+		self.selected_deal_id: Union[int, str, None] = deal_number
+		self.current_deal_id: Union[int, str, None] = None
 		self.setWindowTitle(f"FreeCell - {QT_API}")
 		self.resize(900, 700)
 
@@ -207,9 +238,11 @@ class MainWindow(QMainWindow):
 		self.setCentralWidget(container)
 
 		self._connect_signals()
-		if self.board.current_deal_number is not None:
-			self._on_deal_number_changed(self.board.current_deal_number)
-		self.statusBar().showMessage(f"Ready - Deal #{self.board.current_deal_number}.")
+		if self.board.current_deal_id is not None:
+			self._on_deal_id_changed(self.board.current_deal_id)
+		# Format initial status message
+		deal_label = f"Deal #{self.board.current_deal_id}" if isinstance(self.board.current_deal_id, int) else f"Deal: {self.board.current_deal_id}"
+		self.statusBar().showMessage(f"Ready - {deal_label}.")
 
 	def _connect_signals(self):
 		"""Wire control actions to board operations and status updates."""
@@ -222,22 +255,25 @@ class MainWindow(QMainWindow):
 
 		self.board.status_changed.connect(self.statusBar().showMessage)
 		self.board.move_count_changed.connect(self.controls.set_move_count)
-		self.board.deal_number_changed.connect(self._on_deal_number_changed)
+		self.board.deal_id_changed.connect(self._on_deal_id_changed)
 		self.board.solver_running_changed.connect(self.controls.set_solver_running)
 		self.board.game_won.connect(self._on_game_won)
 
-	def _on_deal_number_changed(self, deal_number: int):
-		"""Persist and display current deal number in main window metadata."""
-		self.current_deal_number = deal_number
-		self.setWindowTitle(f"FreeCell - {QT_API} - Deal #{deal_number}")
+	def _on_deal_id_changed(self, deal_id: Union[int, str]):
+		"""Persist and display current deal ID in main window metadata."""
+		self.current_deal_id = deal_id
+		if isinstance(deal_id, int):
+			self.setWindowTitle(f"FreeCell - {QT_API} - Deal #{deal_id}")
+		else:
+			self.setWindowTitle(f"FreeCell - {QT_API} - Deal: {deal_id}")
 
 	def _on_new_game_requested(self):
 		"""Prompt optional deal number and start a new game from that input."""
-		dialog = DealNumberDialog(self, initial_deal_number=self.current_deal_number)
+		dialog = DealNumberDialog(self, initial_deal_number=self.current_deal_id)
 		if dialog.exec() != QDialog.DialogCode.Accepted:
 			return
 
-		self.board.requested_deal_number = dialog.selected_deal_number
+		self.board.requested_deal_id = dialog.selected_deal_number
 		try:
 			self.board.new_game()
 		except ValueError as exc:

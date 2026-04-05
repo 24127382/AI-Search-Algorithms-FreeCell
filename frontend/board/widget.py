@@ -1,8 +1,9 @@
 """Concrete board widget composed from UI, interaction, and solver mixins."""
 
 from copy import deepcopy
+from typing import Union
 
-from backend.engine.shuffle import deal_by_game_number, random_deal_number
+from backend.engine.shuffle import generate_game, random_deal_number
 from backend.model.state import State
 from frontend.board.move_interaction_mixin import BoardMoveInteractionMixin
 from frontend.board.move_core_mixin import BoardMoveCoreMixin
@@ -25,14 +26,14 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 	status_changed = Signal(str)
 	move_count_changed = Signal(int)
 	game_won = Signal()
-	deal_number_changed = Signal(int)
+	deal_id_changed = Signal(object)  # Can be int (Microsoft deal) or str (special test case)
 	solver_running_changed = Signal(bool)
 
-	def __init__(self, deal_number: int | None = None, parent=None):
+	def __init__(self, deal_number: Union[int, str, None] = None, parent=None):
 		"""Initialize board internals, build UI, and start first deal.
 
 		Args:
-			deal_number: Optional fixed Microsoft deal number.
+			deal_number: Optional Microsoft deal number (int) or special test case ID (str).
 			parent: Optional parent widget.
 		"""
 		super().__init__(parent)
@@ -41,8 +42,8 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self.history: list[State] = []
 		self.selected_source: tuple | None = None
 		self.move_count = 0
-		self.requested_deal_number: int | None = deal_number
-		self.current_deal_number: int | None = None
+		self.requested_deal_id: Union[int, str, None] = deal_number  # Can be int or str
+		self.current_deal_id: Union[int, str, None] = None  # Can be int or str
 		self.solver_thread = None
 		self.is_solving = False
 		self._solve_started_at = 0.0
@@ -86,21 +87,31 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		Returns:
 			State: Freshly initialized game state.
 		"""
-		deal_number = self.requested_deal_number if self.requested_deal_number is not None else random_deal_number()
-		tableau = deal_by_game_number(deal_number)
-		self.current_deal_number = deal_number
-		self.deal_number_changed.emit(deal_number)
-		self._update_deal_number_label()
-		return State.from_lists(tableau=tableau, freecells=[None] * 4, foundations=[[] for _ in range(4)])
+		if self.requested_deal_id is not None:
+			# Use requested deal (int or str)
+			deal_id = self.requested_deal_id
+		else:
+			# Generate random deal number
+			deal_id = random_deal_number()
+		
+		state = generate_game(deal_id)
+		self.current_deal_id = deal_id
+		self.deal_id_changed.emit(deal_id)
+		self._update_deal_label()
+		return state
 
-	def _update_deal_number_label(self):
-		"""Refresh on-board deal number text shown at bottom-left."""
+	def _update_deal_label(self):
+		"""Refresh on-board deal ID text shown at bottom-left (handles both int and str)."""
 		if self._deal_number_label is None:
 			return
-		if self.current_deal_number is None:
+		if self.current_deal_id is None:
 			self._deal_number_label.setText("Deal #-")
 			return
-		self._deal_number_label.setText(f"Deal #{self.current_deal_number}")
+		# Format: "Deal #42" for int, "Deal: bfs_easy_10" for str
+		if isinstance(self.current_deal_id, str):
+			self._deal_number_label.setText(f"Deal: {self.current_deal_id}")
+		else:
+			self._deal_number_label.setText(f"Deal #{self.current_deal_id}")
 
 	def new_game(self):
 		"""Reset game/session counters and render a new deal."""
@@ -116,9 +127,13 @@ class BoardWidget(BoardUiRenderMixin, BoardUiLayoutMixin, BoardMoveInteractionMi
 		self._play_deal_shuffle_on_next_render = True
 		self._render()
 		if solver_stopped:
-			self._emit_status(f"Solver stopped. New game started - Deal #{self.current_deal_number}.")
+			# Format deal ID for message
+			deal_label = f"Deal #{self.current_deal_id}" if isinstance(self.current_deal_id, int) else f"Deal: {self.current_deal_id}"
+			self._emit_status(f"Solver stopped. New game started - {deal_label}.")
 			return
-		self._emit_status(f"New game started - Deal #{self.current_deal_number}.")
+		# Format deal label for both int and str IDs
+		deal_label = f"Deal #{self.current_deal_id}" if isinstance(self.current_deal_id, int) else f"Deal: {self.current_deal_id}"
+		self._emit_status(f"New game started - {deal_label}.")
 
 	def resizeEvent(self, event):
 		"""Keep card widgets aligned/visible when the board is resized."""
