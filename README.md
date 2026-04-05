@@ -34,6 +34,7 @@ Main goals of this project:
 - PySide6 (desktop UI)
 - pytest (tests)
 - pandas/matplotlib/numpy (experiments/benchmarking support)
+- freecell-solver (dependency in project metadata)
 
 ## Project Structure
 
@@ -46,16 +47,25 @@ Main goals of this project:
 |- source/
 |  |- app/                      # Application entrypoint wiring
 |  |- application/
-|  |  |- engine/                # Move generation, apply move, deal/shuffle
-|  |  |- services/              # Facade services used by UI
-|  |  \- experiments/           # Runtime stats helpers
+|  |  |- engine/                # Move generation, move application, deal/shuffle
+|  |  |- services/              # GameService/SolverService facades for UI
+|  |  \- experiments/           # Benchmarks and solver stats formatting
 |  |- domain/
-|  |  |- model/                 # Card, Move, State (immutable)
+|  |  |- model/                 # Card, Move, State (immutable/canonical key)
 |  |  |- rule/                  # FreeCell rule checks
-|  |  \- solver/                # BFS, DFS, UCS, A*, utilities
+|  |  \- solver/
+|  |     |- bfs.py dfs.py ucs.py astar.py
+|  |     |- algorithms.py       # Search facade + supported keys
+|  |     |- search_utils/       # Profiles + UCS/A* helpers
+|  |     \- utils/              # Heuristics, env parsing, state helpers
 |  \- presentation/
-|     \- qt/                    # Main window, board widget, controls, threading
-\- tests/                       # Regression/stat tests + benchmark script
+|     \- qt/
+|        |- main_window.py control_panel.py
+|        |- board/              # Board widget + move/solver mixins + thread
+|        |- card/               # Qt card assets/helpers
+|        \- shared/             # Qt/env helpers
+|- tests/                       # Regression/stat tests + benchmark script
+\- benchmark_results/           # Generated experiment outputs
 ```
 
 ## Architecture
@@ -156,6 +166,7 @@ After solver finds a path, review mode is enabled:
 
 - Breadth-first traversal.
 - Uses canonical state key deduplication.
+- Stops on cancellation, hard time cap, or expanded-node limit.
 - Returns shortest solution in number of moves (when solution exists).
 
 ### DFS
@@ -168,6 +179,7 @@ After solver finds a path, review mode is enabled:
 
 - Uniform-Cost Search on weighted move costs.
 - Uses dominance pruning based on best-known `g` cost per state.
+- Uses forced safe-foundation closure after each expanded move.
 - Shares cost model with A* to make comparisons meaningful.
 
 ### A* (Weighted)
@@ -175,6 +187,7 @@ After solver finds a path, review mode is enabled:
 - Weighted A*: `f(n) = g(n) + w * h(n)`.
 - `g` uses same edge cost function as UCS.
 - Default heuristic weight from `ASTAR_WEIGHT` (default `5.0`).
+- Default heuristic in app facade is `buried_cards`.
 - Reopen policy for better paths when needed.
 
 ## Heuristics and Cost Model
@@ -182,6 +195,7 @@ After solver finds a path, review mode is enabled:
 Implemented heuristics include:
 
 - `zero_heuristic`
+- `cards_remaining_heuristic`
 - `foundation_distance`
 - `buried_cards`
 - `combined_heuristic = max(foundation_distance, buried_cards)`
@@ -255,20 +269,44 @@ Below are tunable environment variables discovered from the source code.
 | `UCS_RUNTIME_LOG` | `1` | Print UCS runtime stats (`0` to disable). |
 | `ASTAR_RUNTIME_LOG` | `1` | Print A* runtime stats (`0` to disable). |
 
-### Inner Cancel Check Intervals
+### Search Loop Intervals
+
+| Variable | Default | Description |
+|---|---:|---|
+| `BFS_INNER_CANCEL_CHECK_INTERVAL` | `256` | Cancel check frequency inside BFS move loop. |
+| `DFS_INNER_CANCEL_CHECK_INTERVAL` | `256` | Cancel check frequency inside DFS move loop. |
+| `UCS_INNER_CANCEL_CHECK_INTERVAL` | `256` | Cancel check frequency inside UCS move loop. |
+| `ASTAR_INNER_CANCEL_CHECK_INTERVAL` | `256` | Cancel check frequency inside A* move loop. |
+| `BFS_STATS_UPDATE_INTERVAL` | `32` | Peak-stat refresh frequency for BFS. |
+| `DFS_STATS_UPDATE_INTERVAL` | `32` | Peak-stat refresh frequency for DFS. |
+| `UCS_STATS_UPDATE_INTERVAL` | `32` | Peak-stat refresh frequency for UCS. |
+| `ASTAR_STATS_UPDATE_INTERVAL` | `32` | Peak-stat refresh frequency for A*. |
+
+### BFS and DFS Limits
 
 | Variable | Default |
 |---|---:|
-| `BFS_INNER_CANCEL_CHECK_INTERVAL` | `64` |
-| `DFS_INNER_CANCEL_CHECK_INTERVAL` | `64` |
-| `UCS_INNER_CANCEL_CHECK_INTERVAL` | `64` |
-| `ASTAR_INNER_CANCEL_CHECK_INTERVAL` | `64` |
+| `BFS_HARD_TIME_CAP_MS` | `60000.0` |
+| `BFS_MAX_EXPANDED_NODES` | `1000000` |
+| `DFS_HARD_TIME_CAP_MS` | `60000.0` |
 
-### DFS Profile and Limits
+### A* Arena/Compaction
 
-| Variable | Default |
-|---|---:|
-| `DFS_HARD_TIME_CAP_MS` | `30000.0` |
+| Variable | Default | Description |
+|---|---:|---|
+| `ASTAR_COMPACT_MIN_ARENA_NODES` | `4096` | Periodic threshold for compaction checks. |
+| `ASTAR_COMPACT_ARENA_LIVE_RATIO` | `2` | Compaction aggressiveness ratio. |
+
+### UCS Search Profile
+
+| Variable | Default | Description |
+|---|---:|---|
+| `UCS_SORT_CANDIDATE_MOVES` | `False` | Deterministic candidate sorting before expansion. |
+| `UCS_PRUNE_SAFE_MOVES` | `True` | Collapse safe-foundation branch to one dominant move. |
+| `UCS_PRUNE_IMMEDIATE_UNDO` | `True` | Skip direct one-step undo moves. |
+| `UCS_PRUNE_CANONICAL_REDUNDANT` | `True` | Prune canonical-equivalent move variants. |
+| `UCS_DOMINANCE_PRUNING_ENABLED` | `True` | Enable best-cost dominance pruning. |
+| `UCS_MOVE_INTERNING_ENABLED` | `True` | Intern move signatures to reduce memory. |
 
 ### A* and Search Tie-Break Bias
 
