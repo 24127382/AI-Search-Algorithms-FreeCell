@@ -154,7 +154,7 @@ class DFSProfile:
     runtime_log_enabled: bool = True
     inner_cancel_check_interval: int = 256
     stats_update_interval: int = 32
-    hard_time_cap_ms: float = 30000.0
+    hard_time_cap_ms: float = 60000.0
 
     @staticmethod
     def from_env() -> "DFSProfile":
@@ -164,7 +164,7 @@ class DFSProfile:
                 "DFS_INNER_CANCEL_CHECK_INTERVAL", 256, minimum=1
             ),
             stats_update_interval=env_int("DFS_STATS_UPDATE_INTERVAL", 32, minimum=1),
-            hard_time_cap_ms=env_float("DFS_HARD_TIME_CAP_MS", 30000.0, minimum=1.0),
+            hard_time_cap_ms=env_float("DFS_HARD_TIME_CAP_MS", 60000.0, minimum=1.0),
         )
 
     @staticmethod
@@ -205,6 +205,11 @@ class UCSProfile:
     inner_cancel_check_interval: int = 256
     stats_update_interval: int = 32
     sort_candidate_moves: bool = False
+    prune_safe_moves: bool = True
+    prune_immediate_undo: bool = True
+    prune_canonical_redundant: bool = True
+    dominance_pruning_enabled: bool = True
+    move_interning_enabled: bool = True
 
     @staticmethod
     def from_env() -> "UCSProfile":
@@ -215,6 +220,15 @@ class UCSProfile:
             ),
             stats_update_interval=env_int("UCS_STATS_UPDATE_INTERVAL", 32, minimum=1),
             sort_candidate_moves=env_bool("UCS_SORT_CANDIDATE_MOVES", False),
+            prune_safe_moves=env_bool("UCS_PRUNE_SAFE_MOVES", True),
+            prune_immediate_undo=env_bool("UCS_PRUNE_IMMEDIATE_UNDO", True),
+            prune_canonical_redundant=env_bool(
+                "UCS_PRUNE_CANONICAL_REDUNDANT", True
+            ),
+            dominance_pruning_enabled=env_bool(
+                "UCS_DOMINANCE_PRUNING_ENABLED", True
+            ),
+            move_interning_enabled=env_bool("UCS_MOVE_INTERNING_ENABLED", True),
         )
 
     @staticmethod
@@ -239,6 +253,30 @@ class UCSProfile:
             ),
             sort_candidate_moves=bool(
                 payload.get("sort_candidate_moves", defaults.sort_candidate_moves)
+            ),
+            prune_safe_moves=bool(
+                payload.get("prune_safe_moves", defaults.prune_safe_moves)
+            ),
+            prune_immediate_undo=bool(
+                payload.get("prune_immediate_undo", defaults.prune_immediate_undo)
+            ),
+            prune_canonical_redundant=bool(
+                payload.get(
+                    "prune_canonical_redundant",
+                    defaults.prune_canonical_redundant,
+                )
+            ),
+            dominance_pruning_enabled=bool(
+                payload.get(
+                    "dominance_pruning_enabled",
+                    defaults.dominance_pruning_enabled,
+                )
+            ),
+            move_interning_enabled=bool(
+                payload.get(
+                    "move_interning_enabled",
+                    defaults.move_interning_enabled,
+                )
             ),
         )
 

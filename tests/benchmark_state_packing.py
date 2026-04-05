@@ -25,11 +25,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Import engine first to avoid known service/solver circular import during test bootstrap.
+import source.application.engine.engine  # noqa: F401
 import source.domain.solver.astar as astar_module
 import source.domain.solver.bfs as bfs_module
 import source.domain.solver.dfs as dfs_module
 import source.domain.solver.search_utils.ucs_utils as ucs_utils
 import source.domain.solver.ucs as ucs_module
+import source.domain.solver.utils.utility as utility_module
 from source.application.engine.shuffle import deal_by_game_number
 from source.domain.model.state import State
 from source.domain.solver.astar import AStarAlgorithm
@@ -37,10 +40,12 @@ from source.domain.solver.bfs import BFSAlgorithm
 from source.domain.solver.dfs import DFSAlgorithm
 from source.domain.solver.ucs import UCSAlgorithm
 from source.domain.solver.utils.heuristics import combined_heuristic
+from source.domain.solver.utils.zobrist import zobrist_hash_state
 
 PACKED_MODE = "packed"
 UNPACKED_MODE = "unpacked"
-ALL_MODES = (PACKED_MODE, UNPACKED_MODE)
+ZOBRIST_MODE = "zobrist"
+ALL_MODES = (PACKED_MODE, UNPACKED_MODE, ZOBRIST_MODE)
 ALL_ALGOS = ("BFS", "DFS", "UCS", "A*")
 
 
@@ -134,18 +139,24 @@ def _select_key_func(mode: str) -> Callable[[State], object]:
         return lambda state: state.board_code
     if mode == UNPACKED_MODE:
         return lambda state: (state.tableau, state.freecells, state.foundations)
+    if mode == ZOBRIST_MODE:
+        return lambda state: int(zobrist_hash_state(state))
     raise ValueError(f"Unsupported mode: {mode}")
 
 
 @contextmanager
 def _state_key_mode(mode: str):
-    original_utils_state_id = ucs_utils.state_id
+    original_utility_state_id = utility_module.state_id
+    original_utility_state_key = utility_module.state_key
     original_ucs_state_id = ucs_module.state_id
     original_astar_state_id = astar_module.state_id
+    original_bfs_state_key = bfs_module.state_key
+    original_dfs_state_key = getattr(dfs_module, "state_key", None)
     original_state_hash = State.__hash__
 
     if mode == PACKED_MODE:
         selected_state_id = lambda state: state.board_code
+        selected_state_key = lambda state: state.board_code
         selected_hash = lambda state: hash(state.board_code)
     elif mode == UNPACKED_MODE:
         selected_state_id = lambda state: (
@@ -153,23 +164,40 @@ def _state_key_mode(mode: str):
             state.freecells,
             state.foundations,
         )
+        selected_state_key = lambda state: (
+            state.tableau,
+            state.freecells,
+            state.foundations,
+        )
         selected_hash = lambda state: hash(
             (state.tableau, state.freecells, state.foundations)
         )
+    elif mode == ZOBRIST_MODE:
+        selected_state_id = lambda state: int(zobrist_hash_state(state))
+        selected_state_key = lambda state: int(zobrist_hash_state(state))
+        selected_hash = lambda state: int(zobrist_hash_state(state))
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
-    ucs_utils.state_id = selected_state_id
+    utility_module.state_id = selected_state_id
+    utility_module.state_key = selected_state_key
     ucs_module.state_id = selected_state_id
     astar_module.state_id = selected_state_id
+    bfs_module.state_key = selected_state_key
+    if hasattr(dfs_module, "state_key"):
+        dfs_module.state_key = selected_state_key
     State.__hash__ = selected_hash
 
     try:
         yield
     finally:
-        ucs_utils.state_id = original_utils_state_id
+        utility_module.state_id = original_utility_state_id
+        utility_module.state_key = original_utility_state_key
         ucs_module.state_id = original_ucs_state_id
         astar_module.state_id = original_astar_state_id
+        bfs_module.state_key = original_bfs_state_key
+        if original_dfs_state_key is not None and hasattr(dfs_module, "state_key"):
+            dfs_module.state_key = original_dfs_state_key
         State.__hash__ = original_state_hash
 
 
@@ -310,49 +338,34 @@ def _print_algorithm_block(
     trials: int,
     mode_runs: dict[str, list[RunResult]],
 ) -> None:
-    print(f"\n=== {algorithm} Expansion Speed (Solver Logic): Packed vs Unpacked ===")
+    print(f"\n=== {algorithm} Expansion Speed (Solver Logic): Mode Comparison ===")
     print(f"seed={deal} target_expansions={max_expand} trials={trials}")
 
-    packed_runs = mode_runs.get(PACKED_MODE, [])
-    unpacked_runs = mode_runs.get(UNPACKED_MODE, [])
+    mode_means: dict[str, float] = {}
+    for mode, runs in mode_runs.items():
+        if not runs:
+            continue
 
-    if packed_runs:
-        packed_last = packed_runs[-1]
-        packed_mean = statistics.mean(run.elapsed_s for run in packed_runs)
-        packed_median = statistics.median(run.elapsed_s for run in packed_runs)
-        packed_stdev = (
-            statistics.stdev(run.elapsed_s for run in packed_runs)
-            if len(packed_runs) > 1
-            else 0.0
+        mode_last = runs[-1]
+        mode_mean = statistics.mean(run.elapsed_s for run in runs)
+        mode_median = statistics.median(run.elapsed_s for run in runs)
+        mode_stdev = (
+            statistics.stdev(run.elapsed_s for run in runs) if len(runs) > 1 else 0.0
         )
-        packed_rate = (max_expand / packed_mean) if packed_mean > 0 else 0.0
-        print(f"packed_unique_last_trial={packed_last.unique_states}")
-        print(f"packed_mean={packed_mean:.6f}s packed_rate={packed_rate:.2f} nodes/s")
-        print(f"packed_median={packed_median:.6f}s packed_stdev={packed_stdev:.6f}s")
+        mode_rate = (max_expand / mode_mean) if mode_mean > 0 else 0.0
+        mode_means[mode] = mode_mean
 
-    if unpacked_runs:
-        unpacked_last = unpacked_runs[-1]
-        unpacked_mean = statistics.mean(run.elapsed_s for run in unpacked_runs)
-        unpacked_median = statistics.median(run.elapsed_s for run in unpacked_runs)
-        unpacked_stdev = (
-            statistics.stdev(run.elapsed_s for run in unpacked_runs)
-            if len(unpacked_runs) > 1
-            else 0.0
-        )
-        unpacked_rate = (max_expand / unpacked_mean) if unpacked_mean > 0 else 0.0
-        print(f"unpacked_unique_last_trial={unpacked_last.unique_states}")
-        print(
-            f"unpacked_mean={unpacked_mean:.6f}s unpacked_rate={unpacked_rate:.2f} nodes/s"
-        )
-        print(
-            f"unpacked_median={unpacked_median:.6f}s unpacked_stdev={unpacked_stdev:.6f}s"
-        )
+        print(f"{mode}_unique_last_trial={mode_last.unique_states}")
+        print(f"{mode}_mean={mode_mean:.6f}s {mode}_rate={mode_rate:.2f} nodes/s")
+        print(f"{mode}_median={mode_median:.6f}s {mode}_stdev={mode_stdev:.6f}s")
 
-    if packed_runs and unpacked_runs:
-        packed_mean = statistics.mean(run.elapsed_s for run in packed_runs)
-        unpacked_mean = statistics.mean(run.elapsed_s for run in unpacked_runs)
-        speed_ratio = (unpacked_mean / packed_mean) if packed_mean > 0 else float("inf")
-        print(f"packed_over_unpacked_speed={speed_ratio:.3f}x")
+    packed_mean = mode_means.get(PACKED_MODE)
+    if packed_mean and packed_mean > 0:
+        for mode, mode_mean in mode_means.items():
+            if mode == PACKED_MODE:
+                continue
+            ratio = mode_mean / packed_mean
+            print(f"{PACKED_MODE}_over_{mode}_speed={ratio:.3f}x")
 
 
 def _mean_peak_bytes(runs: list[RunResult]) -> float | None:
@@ -381,34 +394,25 @@ def _print_memory_block(
     print(f"\n=== {algorithm} Peak Memory (tracemalloc, Solver Logic) ===")
     print(f"memory_trials={memory_trials}")
 
-    packed_runs = mode_runs.get(PACKED_MODE, [])
-    unpacked_runs = mode_runs.get(UNPACKED_MODE, [])
+    peak_means: dict[str, float] = {}
+    for mode, runs in mode_runs.items():
+        mode_peak_mean = _mean_peak_bytes(runs)
+        mode_bytes_per_unique = _mean_bytes_per_unique_state(runs)
 
-    packed_peak_mean = _mean_peak_bytes(packed_runs)
-    unpacked_peak_mean = _mean_peak_bytes(unpacked_runs)
+        if mode_peak_mean is not None:
+            peak_means[mode] = mode_peak_mean
+            print(f"{mode}_peak_mean={mode_peak_mean / (1024 * 1024):.3f} MB")
 
-    if packed_peak_mean is not None:
-        print(f"packed_peak_mean={packed_peak_mean / (1024 * 1024):.3f} MB")
+        if mode_bytes_per_unique is not None:
+            print(f"{mode}_bytes_per_unique_state={mode_bytes_per_unique:.1f}")
 
-    if unpacked_peak_mean is not None:
-        print(f"unpacked_peak_mean={unpacked_peak_mean / (1024 * 1024):.3f} MB")
-
-    if (
-        packed_peak_mean is not None
-        and unpacked_peak_mean is not None
-        and packed_peak_mean > 0
-    ):
-        print(
-            f"unpacked_over_packed_memory={unpacked_peak_mean / packed_peak_mean:.3f}x"
-        )
-
-    packed_bytes_per_unique = _mean_bytes_per_unique_state(packed_runs)
-    unpacked_bytes_per_unique = _mean_bytes_per_unique_state(unpacked_runs)
-
-    if packed_bytes_per_unique is not None:
-        print(f"packed_bytes_per_unique_state={packed_bytes_per_unique:.1f}")
-    if unpacked_bytes_per_unique is not None:
-        print(f"unpacked_bytes_per_unique_state={unpacked_bytes_per_unique:.1f}")
+    packed_peak_mean = peak_means.get(PACKED_MODE)
+    if packed_peak_mean and packed_peak_mean > 0:
+        for mode, mode_peak_mean in peak_means.items():
+            if mode == PACKED_MODE:
+                continue
+            ratio = mode_peak_mean / packed_peak_mean
+            print(f"{mode}_over_{PACKED_MODE}_memory={ratio:.3f}x")
 
 
 def main() -> int:

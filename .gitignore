@@ -209,3 +209,5 @@ __marimo__/
 *.tex
 *.md
 !README.md
+
+/benchmark_results/

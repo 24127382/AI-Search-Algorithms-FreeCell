@@ -51,6 +51,11 @@ class UCSAlgorithm:
         inner_cancel_check_interval = profile.inner_cancel_check_interval
         stats_update_interval = profile.stats_update_interval
         sort_candidate_moves = profile.sort_candidate_moves
+        prune_safe_moves = profile.prune_safe_moves
+        prune_immediate_undo = profile.prune_immediate_undo
+        prune_canonical_redundant = profile.prune_canonical_redundant
+        dominance_pruning_enabled = profile.dominance_pruning_enabled
+        move_interning_enabled = profile.move_interning_enabled
         counter = 0
         start_state = self.game_state
         start_state_id = state_id(start_state)
@@ -162,8 +167,9 @@ class UCSAlgorithm:
             )
             candidate_moves = get_valid_moves(
                 current_state,
-                last_move=last_move,
-                prune_canonical_redundant=True,
+                prune_safe=prune_safe_moves,
+                last_move=last_move if prune_immediate_undo else None,
+                prune_canonical_redundant=prune_canonical_redundant,
                 sort_moves=sort_candidate_moves,
             )
 
@@ -190,13 +196,24 @@ class UCSAlgorithm:
                 generated_nodes += 1
 
                 old_cost = best_cost.get(next_state_id)
-                if old_cost is not None and new_cost >= old_cost:
+                if (
+                    dominance_pruning_enabled
+                    and old_cost is not None
+                    and new_cost >= old_cost
+                ):
                     dominance_pruned += 1
                     continue
 
-                edge_move_ids = encode_edge_moves(
-                    edge_moves, move_index_by_signature, move_pool
-                )
+                if move_interning_enabled:
+                    edge_move_ids = encode_edge_moves(
+                        edge_moves, move_index_by_signature, move_pool
+                    )
+                else:
+                    base_idx = len(move_pool)
+                    move_pool.extend(edge_moves)
+                    edge_move_ids = tuple(
+                        range(base_idx, base_idx + len(edge_moves))
+                    )
                 node_index = len(parent_index_arena)
                 best_cost[next_state_id] = new_cost
                 best_node_index[next_state_id] = node_index
