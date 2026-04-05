@@ -18,11 +18,26 @@ class SearchAlgorithm:
         """
         self.game_state = game_state
         self.should_cancel = should_cancel or (lambda: False)
+        
+        # Store algorithm instances for access to their methods (e.g., get_user_feedback)
+        self.bfs_instance = BFSAlgorithm(self.game_state, should_cancel=self.should_cancel)
+        self.dfs_instance = DFSAlgorithm(self.game_state, should_cancel=self.should_cancel)
+        self.ucs_instance = UCSAlgorithm(self.game_state, should_cancel=self.should_cancel)
+        self.astar_instance = AStarAlgorithm(self.game_state, weight=5.0, should_cancel=self.should_cancel)
+        
         self._handlers = {
-            "BFS": BFSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "DFS": DFSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "UCS": UCSAlgorithm(self.game_state, should_cancel=self.should_cancel).search,
-            "A*": AStarAlgorithm(self.game_state,weight=5.0, should_cancel=self.should_cancel).search,
+            "BFS": self.bfs_instance.search,
+            "DFS": self.dfs_instance.search,
+            "UCS": self.ucs_instance.search,
+            "A*": self.astar_instance.search,
+        }
+        
+        # Map algorithm names to instances for feedback extraction
+        self._instances = {
+            "BFS": self.bfs_instance,
+            "DFS": self.dfs_instance,
+            "UCS": self.ucs_instance,
+            "A*": self.astar_instance,
         }
 
     def search(self, algorithm, heuristic_func=combined_heuristic):
@@ -44,3 +59,14 @@ class SearchAlgorithm:
         if algorithm == "A*":
             return handler(heuristic_func)
         return handler()
+    
+    def get_algorithm_instance(self, algorithm: str):
+        """Get the algorithm instance for a given algorithm name.
+        
+        Args:
+            algorithm: Algorithm key (e.g. "BFS", "DFS", "UCS", "A*").
+            
+        Returns:
+            The algorithm instance or None if not found.
+        """
+        return self._instances.get(algorithm)

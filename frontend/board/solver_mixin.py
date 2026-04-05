@@ -377,7 +377,7 @@ class BoardSolverMixin:
 		self._active_solver_run_id = run_id
 
 		self.solver_thread = SolverThread(self.state, algo)
-		self.solver_thread.result_ready.connect(lambda path, label=solver_label, current_run_id=run_id: self._on_solver_finished(label, path, current_run_id))
+		self.solver_thread.result_ready.connect(lambda result, label=solver_label, current_run_id=run_id: self._on_solver_finished(label, result, current_run_id))
 		self.solver_thread.error_occurred.connect(lambda error, label=solver_label, current_run_id=run_id: self._on_solver_error(label, error, current_run_id))
 		self.solver_thread.finished.connect(lambda current_run_id=run_id: self._on_solver_thread_finished(current_run_id))
 		self.solver_thread.start()
@@ -411,19 +411,32 @@ class BoardSolverMixin:
 			self.solver_running_changed.emit(False)
 		self.solver_thread = None
 
-	def _on_solver_finished(self, algo, path, run_id: int):
+	def _on_solver_finished(self, algo, result, run_id: int):
 		"""Receive solved path and start timed replay animation.
 
 		Args:
 			algo: Solver label.
-			path: Solved move sequence.
+			result: Tuple of (path, feedback_message) or just path for backward compat.
 			run_id: Solver invocation id used to ignore stale callbacks.
 		"""
 		if run_id != self._active_solver_run_id:
 			return
+		
+		# Handle both new format (path, feedback) and old format (path only)
+		if isinstance(result, tuple) and len(result) == 2:
+			path, feedback = result
+		else:
+			path = result
+			feedback = None
+		
 		elapsed_ms = ((time.perf_counter() - self._solve_started_at) * 1000) if self._solve_started_at else 0.0
+		
 		if path is None:
-			self._emit_status(f"{algo} failed to find a solution after {elapsed_ms:.0f}ms.")
+			# Use safeguard feedback if available, otherwise generic message
+			if feedback:
+				self._emit_status(f"{algo}: {feedback}")
+			else:
+				self._emit_status(f"{algo} failed to find a solution after {elapsed_ms:.0f}ms.")
 			return
 
 		if path == []:
