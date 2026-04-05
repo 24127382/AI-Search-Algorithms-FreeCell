@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd d:\\\\study\\\\projects-new\\\\AI-Search-Algorithms-FreeCell ; python -c \"\nfrom backend\\.engine\\.shuffle import get_special_test_case\neasy = get_special_test_case\\('bfs_easy_10'\\)\nhard = get_special_test_case\\('bfs_hard_20'\\)\n\nprint\\('Easy:', easy and type\\(easy\\)\\.__name__, easy and easy\\.is_goal\\)\nprint\\('Hard:', hard and type\\(hard\\)\\.__name__, hard and hard\\.is_goal\\)\n\n# Count cards\nif easy:\n    tableau_cards = sum\\(len\\(col\\) for col in easy\\.tableau\\)\n    foundation_cards = sum\\(len\\(f\\) for f in easy\\.foundations\\)\n    freecell_cards = sum\\(1 for c in easy\\.freecells if c\\)\n    print\\(f'Easy - Tableau: \\{tableau_cards\\}, Foundation: \\{foundation_cards\\}, Freecells: \\{freecell_cards\\}'\\)\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

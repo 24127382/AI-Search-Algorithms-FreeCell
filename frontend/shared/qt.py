@@ -1,0 +1,26 @@
+"""Qt compatibility layer for running with PySide6 or PyQt6."""
+
+from PySide6.QtCore import Qt, Signal, QMimeData, QPropertyAnimation, QEasingCurve, QTimer, QThread, QPoint, QUrl
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QLinearGradient, QBrush, QPainterPath, QAction
+from PySide6.QtGui import QDrag
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFrame,
+    QGraphicsOpacityEffect,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+QT_API = "PySide6"

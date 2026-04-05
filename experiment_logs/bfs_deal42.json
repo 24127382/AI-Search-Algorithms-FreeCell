@@ -1,0 +1,136 @@
+{
+  "algorithm": "BFS",
+  "stop_reason": "max_frontier_size_exceeded",
+  "solution_found": false,
+  "solution_length": -1,
+  "logs": [
+    {
+      "algorithm": "BFS",
+      "step": 0,
+      "time": 0.241,
+      "frontier_size": 1346,
+      "expanded_nodes": 500,
+      "current_depth": 5
+    },
+    {
+      "algorithm": "BFS",
+      "step": 1,
+      "time": 0.3823,
+      "frontier_size": 1744,
+      "expanded_nodes": 1000,
+      "current_depth": 5
+    },
+    {
+      "algorithm": "BFS",
+      "step": 2,
+      "time": 0.5127,
+      "frontier_size": 2359,
+      "expanded_nodes": 1500,
+      "current_depth": 6
+    },
+    {
+      "algorithm": "BFS",
+      "step": 3,
+      "time": 0.6354,
+      "frontier_size": 2753,
+      "expanded_nodes": 2000,
+      "current_depth": 6
+    },
+    {
+      "algorithm": "BFS",
+      "step": 4,
+      "time": 0.7219,
+      "frontier_size": 2949,
+      "expanded_nodes": 2500,
+      "current_depth": 6
+    },
+    {
+      "algorithm": "BFS",
+      "step": 5,
+      "time": 0.8114,
+      "frontier_size": 3032,
+      "expanded_nodes": 3000,
+      "current_depth": 7
+    },
+    {
+      "algorithm": "BFS",
+      "step": 6,
+      "time": 0.9273,
+      "frontier_size": 3324,
+      "expanded_nodes": 3500,
+      "current_depth": 7
+    },
+    {
+      "algorithm": "BFS",
+      "step": 7,
+      "time": 1.0212,
+      "frontier_size": 3530,
+      "expanded_nodes": 4000,
+      "current_depth": 7
+    },
+    {
+      "algorithm": "BFS",
+      "step": 8,
+      "time": 1.1572,
+      "frontier_size": 3887,
+      "expanded_nodes": 4500,
+      "current_depth": 7
+    },
+    {
+      "algorithm": "BFS",
+      "step": 9,
+      "time": 1.2914,
+      "frontier_size": 4058,
+      "expanded_nodes": 5000,
+      "current_depth": 7
+    },
+    {
+      "algorithm": "BFS",
+      "step": 10,
+      "time": 1.3839,
+      "frontier_size": 4120,
+      "expanded_nodes": 5500,
+      "current_depth": 7
+    },
+    {
+      "algorithm": "BFS",
+      "step": 11,
+      "time": 1.4938,
+      "frontier_size": 4395,
+      "expanded_nodes": 6000,
+      "current_depth": 8
+    },
+    {
+      "algorithm": "BFS",
+      "step": 12,
+      "time": 1.5657,
+      "frontier_size": 4527,
+      "expanded_nodes": 6500,
+      "current_depth": 8
+    },
+    {
+      "algorithm": "BFS",
+      "step": 13,
+      "time": 1.6545,
+      "frontier_size": 4804,
+      "expanded_nodes": 7000,
+      "current_depth": 8
+    },
+    {
+      "algorithm": "BFS",
+      "step": 14,
+      "time": 1.7391,
+      "frontier_size": 4854,
+      "expanded_nodes": 7500,
+      "current_depth": 8
+    },
+    {
+      "algorithm": "BFS",
+      "step": 15,
+      "time": 1.8043,
+      "frontier_size": 5001,
+      "expanded_nodes": 7805,
+      "current_depth": 0
+    }
+  ]
+}

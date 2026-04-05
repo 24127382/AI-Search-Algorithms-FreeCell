@@ -1,5 +1,5 @@
-# GUI(PyQt6 hoặc PySide6)
-PyQt6==6.6.1
+# GUI(PySide6)
+pyside6>=6.10.2
 
 # Phân tích dữ liệu và vẽ biểu đồ cho phần Experiments
 pandas==2.3.3
@@ -7,3 +7,7 @@ matplotlib==3.10.7
 
 # Các thư viện chuẩn khác 
 numpy==2.3.4
+
+# Testing
+pytest>=8.0.0
+freecell-solver>=0.6.0

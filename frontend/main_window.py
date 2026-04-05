@@ -1,36 +1,233 @@
-import sys
-from pathlib import Path
+"""Main application window and deal-number startup dialog."""
 
-if __package__ is None or __package__ == "":
-	project_root = Path(__file__).resolve().parents[1]
-	if str(project_root) not in sys.path:
-		sys.path.insert(0, str(project_root))
-
-from frontend.board_widget import BoardWidget
+from typing import Union
+from frontend.board.widget import BoardWidget
 from frontend.control_panel import ControlPanel
-from frontend.qt_compat import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QWidget, QT_API
+from frontend.shared.qt import QDialog, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget, QT_API
+
+# Special test case IDs that are supported
+SPECIAL_TEST_CASE_IDS = {"bfs_easy_10", "bfs_hard_20"}
+
+
+class DealNumberDialog(QDialog):
+	"""Modal dialog that lets the player input an optional deal number or special test case ID.
+	
+	Supports:
+	- Integer deal numbers (Microsoft deals): 1, 42, 999999999
+	- Special test case IDs: bfs_easy_10, bfs_hard_20
+	"""
+
+	def __init__(self, parent=None, initial_deal_number: Union[int, str, None] = None):
+		"""Initialize dialog defaults and build input controls.
+
+		Args:
+			parent: Optional parent widget.
+			initial_deal_number: Optional int (Microsoft deal) or str (special test case ID).
+		"""
+		super().__init__(parent)
+		self.selected_deal_number: Union[int, str, None] = initial_deal_number
+		self.setWindowTitle("Start Game")
+		self.setModal(True)
+		self.resize(460, 200)
+		self.setStyleSheet("""
+			QDialog {
+				background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #153824, stop:1 #0d2517);
+			}
+			QLabel {
+				color: #eff9f1;
+			}
+			QPushButton {
+				background-color: #1f8f52;
+				color: white;
+				border: 1px solid #15663a;
+				border-radius: 8px;
+				padding: 8px 14px;
+				font-weight: bold;
+				font-size: 11pt;
+			}
+			QPushButton:hover {
+				background-color: #27a85f;
+			}
+			QPushButton:pressed {
+				background-color: #187843;
+			}
+			QLineEdit {
+				background-color: rgba(255, 255, 255, 0.92);
+				color: #111111;
+				border: 1px solid #15663a;
+				border-radius: 8px;
+				padding: 8px 10px;
+				font-size: 11pt;
+			}
+		""")
+		self._build_ui()
+
+	def _build_ui(self):
+		"""Construct title, deal input, and start button."""
+		layout = QVBoxLayout(self)
+		layout.setContentsMargins(18, 16, 18, 16)
+		layout.setSpacing(12)
+
+		title = QLabel("Enter a Deal Number, Test Case ID, or leave empty for random")
+		title.setStyleSheet("font-size: 13pt; font-weight: bold;")
+		layout.addWidget(title)
+
+		self._deal_input = QLineEdit()
+		self._deal_input.setPlaceholderText("Examples: 42, bfs_easy_10, bfs_hard_20")
+		if self.selected_deal_number is not None:
+			self._deal_input.setText(str(self.selected_deal_number))
+		layout.addWidget(self._deal_input)
+
+		# Add help text showing available special test cases
+		help_text = QLabel("Special test cases: bfs_easy_10 (~10 moves), bfs_hard_20 (~20 moves)")
+		help_text.setStyleSheet("font-size: 9pt; color: #a8c8b0;")
+		layout.addWidget(help_text)
+
+		button_row = QHBoxLayout()
+		button_row.setSpacing(8)
+		start_button = QPushButton("Start")
+		start_button.clicked.connect(self._confirm)
+		cancel_button = QPushButton("Cancel")
+		cancel_button.clicked.connect(self.reject)
+		button_row.addWidget(start_button)
+		button_row.addWidget(cancel_button)
+		layout.addLayout(button_row)
+
+	def _confirm(self):
+		"""Validate optional deal input and close dialog.
+
+		"""
+		raw_value = self._deal_input.text().strip()
+		if not raw_value:
+			self.selected_deal_number = None
+			self.accept()
+			return
+
+		# Try parsing as integer first
+		try:
+			deal_number = int(raw_value)
+			self.selected_deal_number = deal_number
+			self.accept()
+			return
+		except ValueError:
+			pass  # Try as special test case ID next
+
+		# Check if it's a valid special test case ID
+		if raw_value.lower() in SPECIAL_TEST_CASE_IDS:
+			self.selected_deal_number = raw_value.lower()
+			self.accept()
+			return
+
+		# Invalid input
+		error_msg = (
+			f"Invalid input: '{raw_value}'\n\n"
+			f"Please enter:\n"
+			f"  • A valid integer (e.g., 42)\n"
+			f"  • A special test case: bfs_easy_10 or bfs_hard_20\n"
+			f"  • Leave empty for random deal"
+		)
+		QMessageBox.warning(self, "Invalid Deal Input", error_msg)
+		return
+
+
+class VictoryDialog(QDialog):
+	"""Dialog shown after winning with quick next actions."""
+
+	def __init__(self, parent=None):
+		super().__init__(parent)
+		self.selected_action: str | None = None
+		self.setWindowTitle("Victory")
+		self.setModal(True)
+		self.resize(460, 210)
+		self.setStyleSheet("""
+			QDialog {
+				background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #153824, stop:1 #0d2517);
+			}
+			QLabel {
+				color: #eff9f1;
+			}
+			QPushButton {
+				background-color: #1f8f52;
+				color: white;
+				border: 1px solid #15663a;
+				border-radius: 8px;
+				padding: 8px 14px;
+				font-weight: bold;
+				font-size: 11pt;
+			}
+			QPushButton:hover {
+				background-color: #27a85f;
+			}
+			QPushButton:pressed {
+				background-color: #187843;
+			}
+		""")
+		self._build_ui()
+
+	def _build_ui(self):
+		layout = QVBoxLayout(self)
+		layout.setContentsMargins(18, 16, 18, 16)
+		layout.setSpacing(12)
+
+		title = QLabel("Congratulations! You won FreeCell.")
+		title.setStyleSheet("font-size: 13pt; font-weight: bold;")
+		layout.addWidget(title)
+
+		subtitle = QLabel("Choose your next action:")
+		subtitle.setStyleSheet("font-size: 10.5pt;")
+		layout.addWidget(subtitle)
+
+		button_row = QHBoxLayout()
+		button_row.setSpacing(8)
+
+		new_game_button = QPushButton("New Game")
+		new_game_button.clicked.connect(self._choose_new_game)
+		back_button = QPushButton("Back to previous game")
+		back_button.clicked.connect(self._choose_back)
+
+		button_row.addWidget(new_game_button)
+		button_row.addWidget(back_button)
+		layout.addLayout(button_row)
+
+	def _choose_new_game(self):
+		self.selected_action = "new_game"
+		self.accept()
+
+	def _choose_back(self):
+		self.selected_action = "back_previous"
+		self.accept()
 
 
 class MainWindow(QMainWindow):
-	def __init__(self):
-		super().__init__()
-		self.setWindowTitle(f"FreeCell - {QT_API}")
-		self.resize(800, 600)
+	"""Top-level container that hosts controls and the game board."""
 
-		self.board = BoardWidget()
+	def __init__(self, deal_number: Union[int, str, None] = None):
+		"""Create main window with initialized board and control panel.
+
+		Args:
+			deal_number: Optional Microsoft deal number (int) or special test case ID (str).
+		"""
+		super().__init__()
+		self.selected_deal_id: Union[int, str, None] = deal_number
+		self.current_deal_id: Union[int, str, None] = None
+		self.setWindowTitle(f"FreeCell - {QT_API}")
+		self.resize(900, 700)
+
+		self.board = BoardWidget(deal_number=deal_number)
 		self.controls = ControlPanel()
 
 		container = QWidget()
 		container.setObjectName("MainContainer")
 		container.setStyleSheet("""
 			QWidget#MainContainer {
-				background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #2a6639, stop:1 #173d22);
+				background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #2d7341, stop:0.55 #1b4c2d, stop:1 #102d1c);
 			}
 			QStatusBar {
-				color: #e0e0e0;
-				background-color: #08170d;
-				font-size: 13px;
+				color: #eef8f1;
+				background-color: rgba(6, 16, 10, 0.86);
+				font-size: 12pt;
 				font-weight: bold;
+				border-top: 1px solid rgba(255, 255, 255, 0.15);
 			}
 		""")
 		layout = QVBoxLayout(container)
@@ -41,29 +238,57 @@ class MainWindow(QMainWindow):
 		self.setCentralWidget(container)
 
 		self._connect_signals()
-		self.statusBar().showMessage("Ready.")
+		if self.board.current_deal_id is not None:
+			self._on_deal_id_changed(self.board.current_deal_id)
+		# Format initial status message
+		deal_label = f"Deal #{self.board.current_deal_id}" if isinstance(self.board.current_deal_id, int) else f"Deal: {self.board.current_deal_id}"
+		self.statusBar().showMessage(f"Ready - {deal_label}.")
 
 	def _connect_signals(self):
-		self.controls.new_game_requested.connect(self.board.new_game)
+		"""Wire control actions to board operations and status updates."""
+		self.controls.new_game_requested.connect(self._on_new_game_requested)
+		self.controls.restart_requested.connect(self.board.restart)
 		self.controls.undo_requested.connect(self.board.undo)
-		self.controls.hint_requested.connect(self.board.hint)
+		self.controls.solve_requested.connect(self.board.solve_with_algo)
 		self.controls.auto_foundation_requested.connect(self.board.auto_to_foundation)
+		self.controls.stop_solver_requested.connect(self.board.stop_solver)
 
 		self.board.status_changed.connect(self.statusBar().showMessage)
 		self.board.move_count_changed.connect(self.controls.set_move_count)
+		self.board.deal_id_changed.connect(self._on_deal_id_changed)
+		self.board.solver_running_changed.connect(self.controls.set_solver_running)
 		self.board.game_won.connect(self._on_game_won)
 
+	def _on_deal_id_changed(self, deal_id: Union[int, str]):
+		"""Persist and display current deal ID in main window metadata."""
+		self.current_deal_id = deal_id
+		if isinstance(deal_id, int):
+			self.setWindowTitle(f"FreeCell - {QT_API} - Deal #{deal_id}")
+		else:
+			self.setWindowTitle(f"FreeCell - {QT_API} - Deal: {deal_id}")
+
+	def _on_new_game_requested(self):
+		"""Prompt optional deal number and start a new game from that input."""
+		dialog = DealNumberDialog(self, initial_deal_number=self.current_deal_id)
+		if dialog.exec() != QDialog.DialogCode.Accepted:
+			return
+
+		self.board.requested_deal_id = dialog.selected_deal_number
+		try:
+			self.board.new_game()
+		except ValueError as exc:
+			QMessageBox.warning(self, "Cannot Start Deal", str(exc))
+
 	def _on_game_won(self):
-		QMessageBox.information(self, "Victory", "You have completed the FreeCell game!")
+		"""Display a victory dialog with follow-up actions after winning."""
+		dialog = VictoryDialog(self)
+		if dialog.exec() != QDialog.DialogCode.Accepted:
+			return
 
+		if dialog.selected_action == "new_game":
+			self._on_new_game_requested()
+			return
 
-def main():
-	app = QApplication(sys.argv)
-	window = MainWindow()
-	window.show()
-	sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-	main()
-
+		if dialog.selected_action == "back_previous":
+			if not self.board.restore_previous_game_state():
+				QMessageBox.information(self, "No Previous Game", "No previous game state is available to restore.")
